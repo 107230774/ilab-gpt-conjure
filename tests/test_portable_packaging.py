@@ -109,6 +109,7 @@ class PortablePackagingTests(unittest.TestCase):
         self.assertIn("macos-portable-x64", text)
         self.assertIn("actions/upload-artifact", text)
         self.assertIn("actions/download-artifact", text)
+        self.assertIn("GH_REPO: ${{ github.repository }}", text)
         self.assertIn("gh release upload", text)
 
 
