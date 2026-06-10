@@ -180,6 +180,17 @@ export function currentTaskParams(): any {
     moderation: els.moderation.value,
     output_compression: els.outputFormat.value === "png" ? null : Number(els.compression.value),
   };
+  const presetMatch = findPresetForSize(params.size);
+  if (presetMatch) {
+    params.resolution = presetMatch.resolution;
+    params.ratio = presetMatch.ratio;
+    params.orientation = presetMatch.orientation;
+  } else {
+    const dimensions = String(params.size || "").split("x").map((value) => Number(value));
+    if (dimensions.length === 2 && dimensions.every((value) => Number.isFinite(value) && value > 0)) {
+      params.orientation = orientationForDimensions(dimensions[0], dimensions[1]);
+    }
+  }
   if (currentAuthSource() === "api") {
     params.api_provider_id = currentApiProviderId();
     params.api_mode = currentApiMode();

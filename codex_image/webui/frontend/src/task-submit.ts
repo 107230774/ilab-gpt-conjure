@@ -249,6 +249,9 @@ async function runTask() {
   form.append("main_model", currentMainModel());
   form.append("model", params.model);
   form.append("size", params.size);
+  if (params.resolution) form.append("resolution", params.resolution);
+  if (params.ratio) form.append("ratio", params.ratio);
+  if (params.orientation) form.append("orientation", params.orientation);
   form.append("quality", params.quality);
   form.append("output_format", params.output_format);
   form.append("moderation", params.moderation);

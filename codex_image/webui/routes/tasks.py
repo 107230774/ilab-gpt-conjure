@@ -24,7 +24,7 @@ from codex_image.webui.task_metadata import (
     _visible_completed_output_records,
     _with_file_urls,
 )
-from codex_image.webui.thumbnails import create_image_thumbnail
+from codex_image.webui.thumbnails import create_image_thumbnail, thumbnail_needs_refresh
 
 
 def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
@@ -39,6 +39,64 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
                 for task in ctx.storage.list_tasks()
             ]
         }
+
+    @app.get("/api/tasks/recent")
+    def list_recent_tasks(limit: int = Query(200, ge=1, le=500)) -> dict[str, Any]:
+        tasks = ctx.storage.list_recent_task_cards(limit=limit)
+        tasks_by_id = {str(task.get("task_id") or ""): task for task in tasks}
+        queue_state = ctx.queue_storage.read_state()
+        active_ids = [
+            *[str(task_id) for task_id in queue_state.get("waiting", []) if task_id],
+            *[str(item.get("task_id")) for item in queue_state.get("running", {}).values() if isinstance(item, dict) and item.get("task_id")],
+        ]
+        for task_id in active_ids:
+            if task_id in tasks_by_id:
+                continue
+            try:
+                task = ctx.storage.task_sidebar_card(task_id)
+            except (FileNotFoundError, ValueError):
+                continue
+            tasks_by_id[task_id] = task
+            tasks.append(task)
+        return {"tasks": tasks}
+
+    @app.get("/api/task-history/summary")
+    def task_history_summary() -> dict[str, Any]:
+        return ctx.storage.task_history_summary()
+
+    @app.get("/api/task-history/tasks")
+    def task_history_tasks(
+        limit: int = Query(50, ge=1, le=100),
+        cursor: str | None = Query(None),
+        q: str = Query(""),
+        month: str = Query(""),
+        status: str = Query(""),
+        prompt_mode: str = Query(""),
+        size: str = Query(""),
+        quality: str = Query(""),
+        ratio: str = Query(""),
+        orientation: str = Query(""),
+        backend: str = Query(""),
+        provider: str = Query(""),
+        archived: bool | None = Query(None),
+        sort: str = Query("newest"),
+    ) -> dict[str, Any]:
+        return ctx.storage.query_task_history(
+            limit=limit,
+            cursor=cursor,
+            q=q,
+            month=month,
+            status=status,
+            prompt_mode=prompt_mode,
+            size=size,
+            quality=quality,
+            ratio=ratio,
+            orientation=orientation,
+            backend=backend,
+            provider=provider,
+            archived=archived,
+            sort=sort,
+        )
 
     @app.get("/api/tasks/{task_id}")
     def get_task(task_id: str) -> dict[str, Any]:
@@ -135,7 +193,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
             raise HTTPException(status_code=404, detail="Input not found")
 
         thumbnail_path = ctx.storage.input_thumbnail_path(task_id, input_index)
-        if not thumbnail_path.exists():
+        if thumbnail_needs_refresh(input_path, thumbnail_path):
             create_image_thumbnail(input_path, thumbnail_path)
         if not thumbnail_path.exists():
             raise HTTPException(status_code=404, detail="Thumbnail unavailable")

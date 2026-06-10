@@ -31,6 +31,9 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
         main_model: str = Form(DEFAULT_MAIN_MODEL),
         model: str = Form("gpt-image-2"),
         size: str = Form("auto"),
+        resolution: str | None = Form(None),
+        ratio: str | None = Form(None),
+        orientation: str | None = Form(None),
         quality: str = Form("low"),
         background: str | None = Form(None),
         output_format: str = Form("png"),
@@ -115,6 +118,12 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
             stored_request_payload["webui_api_images_concurrency"] = effective_api_images_concurrency
         ctx.storage.write_request(task.task_id, stored_request_payload)
         params = _params(main_model, model, size, quality, background, output_format, moderation, compression, n)
+        if resolution:
+            params["resolution"] = resolution
+        if ratio:
+            params["ratio"] = ratio
+        if orientation:
+            params["orientation"] = orientation
         params["prompt_fidelity"] = fidelity
         if effective_api_mode is not None:
             params["api_mode"] = effective_api_mode
@@ -153,6 +162,9 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
         main_model: str = Form(DEFAULT_MAIN_MODEL),
         model: str = Form("gpt-image-2"),
         size: str = Form("auto"),
+        resolution: str | None = Form(None),
+        ratio: str | None = Form(None),
+        orientation: str | None = Form(None),
         quality: str = Form("low"),
         background: str | None = Form(None),
         output_format: str = Form("png"),
@@ -252,6 +264,12 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
             stored_request_payload["webui_api_images_concurrency"] = effective_api_images_concurrency
         ctx.storage.write_request(task.task_id, stored_request_payload)
         params = _params(main_model, model, size, quality, background, output_format, moderation, compression, n)
+        if resolution:
+            params["resolution"] = resolution
+        if ratio:
+            params["ratio"] = ratio
+        if orientation:
+            params["orientation"] = orientation
         params["prompt_fidelity"] = fidelity
         if effective_input_fidelity:
             params["input_fidelity"] = effective_input_fidelity

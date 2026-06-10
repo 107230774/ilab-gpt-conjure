@@ -23,6 +23,9 @@
   --task-title: var(--text);
   --radius: 8px;
   --radius-lg: 12px;
+  --motion-fast: 140ms ease;
+  --motion-base: 180ms ease;
+  --motion-height: 220ms ease;
   --font: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --shadow-sm: 0 2px 8px rgba(29, 52, 46, 0.04);
   --shadow-popover: 0 14px 34px rgba(29, 52, 46, 0.16);

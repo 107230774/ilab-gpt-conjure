@@ -7,6 +7,7 @@ const state = bridge.state;
 const els = bridge.els;
 
 let taskSelectionInitialized = false;
+const HISTORY_TASK_REUSE_HANDOFF_KEY = "codex-image-history-task-reuse-handoff";
 
 function legacyMethod(name, ...args) {
   const method = getLegacyBridge().methods[name];
@@ -84,6 +85,24 @@ function historyInputCandidateUrls(sourceUrl, fallbackUrl) {
     addUrl(fallbackUrl);
   }
   return urls;
+}
+
+async function loadFullTaskDetail(taskId) {
+  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || translate("notifications.taskMissing"));
+  return data.task;
+}
+
+function replaceSelectedTaskDetail(taskId, task) {
+  if (!task?.task_id) return task;
+  const index = state.tasks.findIndex((item) => String(item.task_id) === String(taskId));
+  if (index >= 0) {
+    state.tasks.splice(index, 1, task);
+  } else {
+    state.tasks.unshift(task);
+  }
+  return task;
 }
 
 async function fetchHistoryInputBlob(candidateUrls, sourceUrl) {
@@ -178,8 +197,22 @@ async function restoreTaskInputs(task, options = {}) {
 async function selectTask(taskId) {
   closePromptPopover();
   state.selectedTaskId = taskId;
-  const task = state.tasks.find((item) => String(item.task_id) === String(taskId));
+  let task = state.tasks.find((item) => String(item.task_id) === String(taskId));
   if (!task) return;
+  if (task.summary_only) {
+    const detailSeq = ++state.taskInputRestoreSeq;
+    updateTaskSelectionVisuals(taskId);
+    setStatus(translate("status.loadingHistoryInputs"), "");
+    try {
+      const fullTask = await loadFullTaskDetail(taskId);
+      if (!selectedTaskInputRestoreCurrent(taskId, detailSeq)) return;
+      task = replaceSelectedTaskDetail(taskId, fullTask);
+    } catch (error) {
+      if (!selectedTaskInputRestoreCurrent(taskId, detailSeq)) return;
+      setStatus(error.message || translate("notifications.taskMissing"), "error");
+      return;
+    }
+  }
   const restoreSeq = ++state.taskInputRestoreSeq;
   void markTaskViewed(taskId);
   applyTaskToForm(task);
@@ -199,10 +232,50 @@ async function selectTask(taskId) {
   if (task.status !== "running") renderSelectedTask(task, taskId);
 }
 
+async function restoreHistoryTaskReuseHandoff() {
+  let raw = "";
+  try {
+    raw = localStorage.getItem(HISTORY_TASK_REUSE_HANDOFF_KEY) || "";
+    if (!raw) return;
+    localStorage.removeItem(HISTORY_TASK_REUSE_HANDOFF_KEY);
+    const parsed = JSON.parse(raw);
+    let task = parsed?.task || null;
+    const taskId = String(parsed?.task_id || task?.task_id || "");
+    if (!taskId) return;
+    if (!task?.task_id) {
+      task = await loadFullTaskDetail(taskId);
+    }
+    closePromptPopover();
+    state.selectedTaskId = taskId;
+    replaceSelectedTaskDetail(taskId, task);
+    const restoreSeq = ++state.taskInputRestoreSeq;
+    applyTaskToForm(task);
+    renderSelectedTask(task, taskId);
+    try {
+      await restoreTaskInputs(task, { taskId, restoreSeq });
+    } catch (error) {
+      if (!selectedTaskInputRestoreCurrent(taskId, restoreSeq)) return;
+      revokeUploadPreviewUrls(state.images);
+      state.images = [];
+      renderImageStrip();
+      setStatus(error.message || translate("referenceCollector.addFailed"), "error");
+      return;
+    }
+    if (!selectedTaskInputRestoreCurrent(taskId, restoreSeq)) return;
+    applySelectedTaskRequestPreview(task);
+    renderSelectedTask(task, taskId);
+    setStatus(formatTranslation("status.reusedTask", { taskId }), "ok");
+  } catch (error) {
+    localStorage.removeItem(HISTORY_TASK_REUSE_HANDOFF_KEY);
+    setStatus(error.message || translate("taskContext.actionFailed"), "error");
+  }
+}
+
 export function initTaskSelectionFeature() {
   if (taskSelectionInitialized) return;
   taskSelectionInitialized = true;
   Object.assign(getLegacyBridge().methods, {
     selectTask,
+    restoreHistoryTaskReuseHandoff,
   });
 }

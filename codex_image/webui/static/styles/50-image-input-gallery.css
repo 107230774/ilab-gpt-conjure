@@ -52,7 +52,7 @@
       color-mix(in srgb, var(--surface-soft) 72%, var(--primary-light))
     ),
     var(--surface-soft);
-  transition: border-color 0.18s ease, background 0.18s ease;
+  transition: border-color var(--motion-base), background var(--motion-base);
 }
 
 .image-input-main:hover {
@@ -269,7 +269,7 @@
 }
 
 .recent-asset-button:hover {
-  border-color: rgba(69, 123, 102, 0.54);
+  border-color: color-mix(in srgb, var(--primary) 54%, transparent);
   background: var(--surface-soft);
 }
 
@@ -306,7 +306,7 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(166, 70, 61, 0.34);
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, transparent);
   border-radius: 999px;
   background: var(--danger-soft);
   color: var(--danger);
@@ -315,7 +315,7 @@
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+  transition: opacity var(--motion-fast), background var(--motion-fast), border-color var(--motion-fast);
 }
 
 .recent-asset-button:hover .recent-asset-delete,
@@ -326,7 +326,7 @@
 
 .recent-asset-delete:hover,
 .recent-asset-delete:focus-visible {
-  border-color: rgba(166, 70, 61, 0.62);
+  border-color: color-mix(in srgb, var(--danger) 62%, transparent);
   background: color-mix(in srgb, var(--danger) 16%, var(--surface));
 }
 
@@ -349,12 +349,12 @@
 .editable-thumb {
   cursor: pointer;
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  transition: border-color var(--motion-base), box-shadow var(--motion-base), transform var(--motion-base);
   touch-action: manipulation;
 }
 
 .editable-thumb:hover {
-  border-color: rgba(69, 123, 102, 0.68);
+  border-color: color-mix(in srgb, var(--primary) 68%, transparent);
   box-shadow: 0 10px 22px rgba(12, 28, 23, 0.14);
   transform: translateY(-1px);
 }
@@ -408,11 +408,11 @@
 }
 
 .gallery-thumb {
-  border-color: rgba(69, 123, 102, 0.45);
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
 }
 
 .asset-thumb {
-  border-color: rgba(155, 127, 79, 0.52);
+  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
 }
 
 .missing-thumb {
@@ -434,7 +434,10 @@
   font-size: 12px;
   cursor: pointer;
   background: transparent;
-  transition: all 0.2s;
+  transition:
+    background var(--motion-base),
+    color var(--motion-base),
+    border-color var(--motion-base);
   gap: 5px;
   text-align: center;
 }
@@ -622,7 +625,7 @@
   border-radius: 8px;
   background: var(--surface-soft);
   box-shadow: 0 14px 36px rgba(29, 52, 46, 0.18);
-  transition: opacity 0.16s ease, transform 0.16s ease;
+  transition: opacity var(--motion-fast), transform var(--motion-fast);
 }
 
 .quick-gallery-preview.visible {
@@ -693,11 +696,11 @@
 }
 
 .quick-gallery-list.bounce-top {
-  animation: quickGalleryBounceTop 160ms ease-out;
+  animation: quickGalleryBounceTop var(--motion-fast);
 }
 
 .quick-gallery-list.bounce-bottom {
-  animation: quickGalleryBounceBottom 160ms ease-out;
+  animation: quickGalleryBounceBottom var(--motion-fast);
 }
 
 .quick-gallery-item {
@@ -717,7 +720,13 @@
   white-space: nowrap;
   scroll-snap-align: start;
   transform: scale(0.96);
-  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease;
+  transition:
+    opacity var(--motion-base),
+    transform var(--motion-base),
+    background var(--motion-base),
+    border-color var(--motion-base),
+    box-shadow var(--motion-base),
+    color var(--motion-base);
 }
 
 .quick-gallery-item.near {
@@ -767,9 +776,30 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .image-input-main,
+  .recent-asset-delete,
+  .editable-thumb,
+  .upload-tile,
+  .quick-gallery-preview,
+  .quick-gallery-item,
+  .quick-gallery-category,
+  .quick-gallery-list.bounce-top,
+  .quick-gallery-list.bounce-bottom {
+    transition: none;
+  }
+
   .quick-gallery-list.bounce-top,
   .quick-gallery-list.bounce-bottom {
     animation: none;
+  }
+
+  .editable-thumb:hover,
+  .quick-gallery-item,
+  .quick-gallery-item.near,
+  .quick-gallery-item.center,
+  .quick-gallery-item:hover,
+  .quick-gallery-item.active {
+    transform: none;
   }
 }
 
@@ -819,7 +849,7 @@
   white-space: nowrap;
   scroll-snap-align: start;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  transition: background var(--motion-base), color var(--motion-base), border-color var(--motion-base);
 }
 
 .quick-gallery-category.active {

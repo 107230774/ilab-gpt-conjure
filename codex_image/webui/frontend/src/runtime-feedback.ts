@@ -1,5 +1,6 @@
 import { getLegacyBridge } from "./state";
 import { formatTranslation, translate } from "./i18n";
+import { cssEscape } from "./webui-utils";
 import type { WebUITask } from "./types";
 
 function legacyMethod(name: string, ...args: any[]): any {
@@ -66,41 +67,89 @@ export function formatTaskStatus(task: WebUITask | null | undefined): string {
   return task.status || "";
 }
 
+let uiClockVisibilityBound = false;
+
 export function startUiClock(): void {
   const state = getLegacyBridge().state;
-  if (state.uiClockTimerId) return;
+  if (!uiClockVisibilityBound) {
+    uiClockVisibilityBound = true;
+    document.addEventListener("visibilitychange", handleUiClockVisibilityChange);
+  }
+  if (state.uiClockTimerId || document.hidden) return;
   state.uiClockTimerId = window.setInterval(updateElapsedDisplays, 100);
+}
+
+function handleUiClockVisibilityChange(): void {
+  const state = getLegacyBridge().state;
+  if (document.hidden) {
+    if (state.uiClockTimerId) {
+      window.clearInterval(state.uiClockTimerId);
+      state.uiClockTimerId = null;
+    }
+    return;
+  }
+  if (!state.uiClockTimerId) {
+    state.uiClockTimerId = window.setInterval(updateElapsedDisplays, 100);
+    updateElapsedDisplays();
+  }
 }
 
 export function updateElapsedDisplays(): void {
   updateTaskElapsedDisplays();
-  window.updateQueueElapsedDisplays?.();
   updatePreviewElapsedDisplay();
+}
+
+const ELAPSED_TICK_STATUSES = new Set(["submitting", "queued", "running"]);
+
+function taskNeedsElapsedTick(task: any): boolean {
+  if (!task) return false;
+  if (task.local_pending) return true;
+  return ELAPSED_TICK_STATUSES.has(String(task.status || ""));
+}
+
+function setTextIfChanged(element: any, text: string): void {
+  if (element.textContent !== text) element.textContent = text;
+}
+
+function activeElapsedTaskCards(els: any, taskId: string): HTMLElement[] {
+  const roots = [els.taskActiveList, els.taskList].filter((root): root is HTMLElement => root instanceof HTMLElement);
+  const cards = roots.flatMap((root) =>
+    Array.from(root.querySelectorAll(`.task-card[data-task-id="${cssEscape(taskId)}"]`)) as HTMLElement[],
+  );
+  return Array.from(new Set(cards));
+}
+
+function updateTaskElapsedCard(card: HTMLElement, task: any): void {
+  const statusElement = card.querySelector("[data-task-status-id]");
+  if (statusElement) {
+    setTextIfChanged(statusElement, formatTaskStatus(task) || translate("taskStatus.unknown"));
+    const statusRow = statusElement.closest(".task-status-row");
+    if (statusRow) {
+      const accessibleLabel = taskStatusAccessibleLabel(task);
+      if (statusRow.getAttribute("aria-label") !== accessibleLabel) {
+        statusRow.setAttribute("aria-label", accessibleLabel);
+      }
+    }
+  }
+
+  const metaElement = card.querySelector("[data-task-meta-id]");
+  if (metaElement) setTextIfChanged(metaElement, taskMetaText(task));
+
+  const runtimeElement = card.querySelector("[data-task-runtime-id]");
+  if (runtimeElement) setTextIfChanged(runtimeElement, taskRuntimeText(task));
+
+  const retryElement = card.querySelector("[data-task-retry-id]");
+  if (retryElement) setTextIfChanged(retryElement, taskRetryStateText(task));
 }
 
 export function updateTaskElapsedDisplays(): void {
   const { state, els } = getLegacyBridge();
-  const root = els.taskHistoryShell || els.taskList;
-  if (!root) return;
-  const tasksById = new Map(state.tasks.map((task: any) => [String(task.task_id), task]));
-  root.querySelectorAll("[data-task-status-id]").forEach((element: any) => {
-    const task = tasksById.get(String(element.dataset.taskStatusId || ""));
-    if (task) {
-      element.textContent = formatTaskStatus(task) || translate("taskStatus.unknown");
-      element.closest(".task-status-row")?.setAttribute("aria-label", taskStatusAccessibleLabel(task));
-    }
-  });
-  root.querySelectorAll("[data-task-meta-id]").forEach((element: any) => {
-    const task = tasksById.get(String(element.dataset.taskMetaId || ""));
-    if (task) element.textContent = taskMetaText(task);
-  });
-  root.querySelectorAll("[data-task-runtime-id]").forEach((element: any) => {
-    const task = tasksById.get(String(element.dataset.taskRuntimeId || ""));
-    if (task) element.textContent = taskRuntimeText(task);
-  });
-  root.querySelectorAll("[data-task-retry-id]").forEach((element: any) => {
-    const task = tasksById.get(String(element.dataset.taskRetryId || ""));
-    if (task) element.textContent = taskRetryStateText(task);
+  const activeTasks = state.tasks.filter((task: any) => taskNeedsElapsedTick(task));
+  if (!activeTasks.length) return;
+  activeTasks.forEach((task: any) => {
+    const taskId = String(task.task_id || "");
+    if (!taskId) return;
+    activeElapsedTaskCards(els, taskId).forEach((card) => updateTaskElapsedCard(card, task));
   });
 }
 

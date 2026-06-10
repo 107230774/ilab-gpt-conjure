@@ -1,5 +1,6 @@
 import { getLegacyBridge } from "./state";
 import { TASK_HISTORY_EXPANDED_GROUP_STORAGE_KEY } from "./state-defaults";
+import { prefersReducedMotion } from "./webui-utils";
 import { formatTranslation } from "./i18n";
 
 const bridge = getLegacyBridge();
@@ -116,6 +117,9 @@ function setExpandedTaskGroupKey(groupKey: string | null, { immediate = false }:
   }
   state.expandedTaskGroupKey = key;
   persistExpandedTaskGroupKey();
+  if (!isAllCollapsedExpandedTaskGroupKey(key)) {
+    state.expandedTaskGroupAnimationPending = true;
+  }
   if (immediate) applyImmediateAnchorSelection(isAllCollapsedExpandedTaskGroupKey(key) ? "" : key);
   state.tasksRenderKey = null;
   return true;
@@ -124,7 +128,7 @@ function setExpandedTaskGroupKey(groupKey: string | null, { immediate = false }:
 function scrollExpandedTaskGroupToTop(behavior: ScrollBehavior = "smooth") {
   const sidebarContent = element(els.sidebarContent);
   if (!sidebarContent) return;
-  sidebarContent.scrollTo({ top: 0, behavior });
+  sidebarContent.scrollTo({ top: 0, behavior: prefersReducedMotion() ? "auto" : behavior });
 }
 
 function anchorRowHtml(group: any) {
@@ -214,6 +218,7 @@ function captureTaskHistoryLayout() {
 }
 
 function animateTaskHistoryLayout(previousLayout: Record<string, { kind: "anchor" | "expanded"; rect: { top: number; left: number; width: number; height: number } }> = {}) {
+  if (prefersReducedMotion()) return;
   requestAnimationFrame(() => {
     taskHistoryLayoutElements().forEach((item) => {
       const previous = previousLayout[item.key];

@@ -147,6 +147,75 @@ class TaskStorage:
             return []
         return self.rebuild_task_index()
 
+    def list_recent_tasks(self, limit: int = 200) -> list[dict[str, Any]]:
+        indexed_tasks = self.task_index.list_summaries(limit=limit)
+        if indexed_tasks:
+            return indexed_tasks
+        return self.rebuild_task_index()[: max(0, limit)]
+
+    def list_recent_task_cards(self, limit: int = 200) -> list[dict[str, Any]]:
+        indexed_tasks = self.task_index.list_summaries(limit=limit)
+        if not indexed_tasks:
+            indexed_tasks = self.rebuild_task_index()[: max(0, limit)]
+        return [_sidebar_task_card(task) for task in indexed_tasks]
+
+    def task_sidebar_card(self, task_id: str) -> dict[str, Any]:
+        return _sidebar_task_card(self.read_metadata(task_id))
+
+    def task_history_summary(self) -> dict[str, Any]:
+        self.refresh_stale_task_index()
+        return self.task_index.history_summary()
+
+    def query_task_history(
+        self,
+        *,
+        limit: int = 50,
+        cursor: str | None = None,
+        q: str = "",
+        month: str = "",
+        status: str = "",
+        prompt_mode: str = "",
+        size: str = "",
+        quality: str = "",
+        ratio: str = "",
+        orientation: str = "",
+        backend: str = "",
+        provider: str = "",
+        archived: bool | None = None,
+        sort: str = "newest",
+    ) -> dict[str, Any]:
+        self.refresh_stale_task_index()
+        return self.task_index.query_history(
+            limit=limit,
+            cursor=cursor,
+            q=q,
+            month=month,
+            status=status,
+            prompt_mode=prompt_mode,
+            size=size,
+            quality=quality,
+            ratio=ratio,
+            orientation=orientation,
+            backend=backend,
+            provider=provider,
+            archived=archived,
+            sort=sort,
+        )
+
+    def refresh_stale_task_index(self, *, limit: int = 500) -> int:
+        refreshed = 0
+        for task_id in self.task_index.stale_completed_task_ids(limit=limit):
+            try:
+                metadata = self.read_metadata(task_id)
+            except (FileNotFoundError, OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(metadata, dict):
+                continue
+            metadata["task_id"] = str(metadata.get("task_id") or task_id)
+            self.task_index.upsert(metadata)
+            refreshed += 1
+        return refreshed
+
     def rebuild_task_index(self) -> list[dict[str, Any]]:
         if not self.source_data_root.exists():
             return []
@@ -322,6 +391,155 @@ class TaskStorage:
             (self.source_data_root / TASK_SOURCE_DATA_SUBDIR).rmdir()
         except OSError:
             pass
+
+
+def _sidebar_task_card(metadata: dict[str, Any]) -> dict[str, Any]:
+    task_id = str(metadata.get("task_id") or "")
+    params = metadata.get("params") if isinstance(metadata.get("params"), dict) else {}
+    size = str(metadata.get("output_size") or params.get("size") or "")
+    thumbnail_url = _first_sidebar_thumbnail_url(metadata)
+    card = {
+        "task_id": task_id,
+        "summary_only": True,
+        "created_at": metadata.get("created_at") or "",
+        "updated_at": metadata.get("updated_at") or "",
+        "viewed_at": metadata.get("viewed_at") or "",
+        "queued_at": metadata.get("queued_at") or "",
+        "started_at": metadata.get("started_at") or "",
+        "attempt_started_at": metadata.get("attempt_started_at") or "",
+        "completed_at": metadata.get("completed_at") or "",
+        "archived_at": metadata.get("archived_at") or "",
+        "status": metadata.get("status") or "",
+        "mode": metadata.get("mode") or "",
+        "prompt": _truncate_text(metadata.get("prompt") or metadata.get("prompt_for_model") or "", 260),
+        "output_size": size,
+        "params": {
+            "size": size,
+            "n": _nonnegative_int(metadata.get("total_count") or params.get("n") or 1, 1),
+            "prompt_fidelity": params.get("prompt_fidelity") or "",
+            "api_provider_id": params.get("api_provider_id") or "",
+            "api_provider_name": params.get("api_provider_name") or "",
+        },
+        "backend": metadata.get("backend") or metadata.get("requested_backend") or "",
+        "requested_backend": metadata.get("requested_backend") or metadata.get("backend") or "",
+        "api_provider_id": metadata.get("api_provider_id") or params.get("api_provider_id") or "",
+        "api_provider_name": metadata.get("api_provider_name") or params.get("api_provider_name") or "",
+        "generated_count": _nonnegative_int(metadata.get("generated_count"), 0),
+        "failed_count": _nonnegative_int(metadata.get("failed_count"), 0),
+        "total_count": _nonnegative_int(metadata.get("total_count") or params.get("n"), 1),
+        "attempts": _nonnegative_int(metadata.get("attempts"), 0),
+        "max_attempts": _nonnegative_int(metadata.get("max_attempts"), 0),
+        "last_error": metadata.get("last_error") or metadata.get("error") or "",
+        "error": metadata.get("error") or "",
+        "retrying_failed_slots": metadata.get("retrying_failed_slots") if isinstance(metadata.get("retrying_failed_slots"), list) else [],
+        "input_thumbnail_urls": _sidebar_input_thumbnail_urls(metadata),
+        "thumbnail_urls": [thumbnail_url] if thumbnail_url else [],
+    }
+    return {key: value for key, value in card.items() if value not in ("", [], {}) or key in {"task_id", "summary_only", "params"}}
+
+
+def _sidebar_input_thumbnail_urls(metadata: dict[str, Any]) -> list[str]:
+    urls = metadata.get("input_thumbnail_urls")
+    if isinstance(urls, list):
+        return [str(url) for url in urls if url]
+    task_id = str(metadata.get("task_id") or "")
+    input_files = metadata.get("input_files")
+    if not task_id or not isinstance(input_files, list):
+        return []
+    return [f"/api/tasks/{task_id}/inputs/{index}/thumbnail" for index, _ in enumerate(input_files, start=1)]
+
+
+def _first_sidebar_thumbnail_url(metadata: dict[str, Any]) -> str:
+    thumbnail_route = _first_output_thumbnail_route(metadata)
+    if thumbnail_route:
+        return thumbnail_route
+    thumbnail_urls = metadata.get("thumbnail_urls")
+    if isinstance(thumbnail_urls, list):
+        for url in thumbnail_urls:
+            if url:
+                return str(url)
+    outputs = metadata.get("outputs")
+    if isinstance(outputs, list):
+        for output in outputs:
+            if not isinstance(output, dict):
+                continue
+            thumbnail_url = output.get("thumbnail_url") or _output_file_url(output.get("thumbnail_file"))
+            if thumbnail_url:
+                return thumbnail_url
+    task_id = str(metadata.get("task_id") or "")
+    output_files = metadata.get("output_files")
+    if task_id and isinstance(output_files, list) and output_files:
+        return f"/api/tasks/{task_id}/outputs/1/thumbnail"
+    output_file = metadata.get("output_file")
+    if task_id and output_file:
+        return f"/api/tasks/{task_id}/outputs/1/thumbnail"
+    return ""
+
+
+def _first_output_thumbnail_route(metadata: dict[str, Any]) -> str:
+    task_id = str(metadata.get("task_id") or "")
+    if not task_id:
+        return ""
+    output_files = metadata.get("output_files") if isinstance(metadata.get("output_files"), list) else []
+    output_urls = metadata.get("output_urls") if isinstance(metadata.get("output_urls"), list) else []
+    outputs = metadata.get("outputs")
+    if isinstance(outputs, list):
+        for fallback_index, output in enumerate(outputs, start=1):
+            if not isinstance(output, dict):
+                continue
+            status = str(output.get("status") or "completed")
+            if status != "completed":
+                continue
+            index = _positive_int(output.get("index")) or fallback_index
+            if (
+                output.get("file")
+                or (index <= len(output_files) and output_files[index - 1])
+                or _is_local_output_url(output.get("url"))
+                or (index <= len(output_urls) and _is_local_output_url(output_urls[index - 1]))
+            ):
+                return f"/api/tasks/{task_id}/outputs/{index}/thumbnail"
+    if output_files:
+        return f"/api/tasks/{task_id}/outputs/1/thumbnail"
+    if output_urls and _is_local_output_url(output_urls[0]):
+        return f"/api/tasks/{task_id}/outputs/1/thumbnail"
+    output_file = metadata.get("output_file")
+    if output_file:
+        return f"/api/tasks/{task_id}/outputs/1/thumbnail"
+    if _is_local_output_url(metadata.get("output_url")):
+        return f"/api/tasks/{task_id}/outputs/1/thumbnail"
+    return ""
+
+
+def _is_local_output_url(value: Any) -> bool:
+    return str(value or "").startswith("/outputs/")
+
+
+def _output_file_url(filename: Any) -> str:
+    parts = [part for part in str(filename or "").split("/") if part]
+    return "/outputs/" + "/".join(parts) if parts else ""
+
+
+def _positive_int(value: Any) -> int | None:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _truncate_text(value: Any, limit: int) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def _nonnegative_int(value: Any, fallback: int) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    return number if number >= 0 else fallback
 
 
 def _same_file_bytes(first: Path, second: Path) -> bool:

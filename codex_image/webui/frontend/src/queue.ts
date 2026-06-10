@@ -87,6 +87,7 @@ export async function handleRealtimePayload(payload: RealtimePayload | null | un
     await bridge.methods.applyTasksSnapshot(payload.tasks || [], {
       migrateLegacyArchives: state.realtimeSnapshotNeedsArchiveMigration,
     });
+    applyQueueTasks(payload.queue);
     state.realtimeSnapshotNeedsArchiveMigration = false;
     return;
   }
@@ -434,7 +435,6 @@ export function handleQueueDragStart(event: DragEvent): void {
   if (!(item instanceof HTMLElement)) return;
   const draggedId = item.dataset.queueTaskId || null;
   getState().queueDragTaskId = draggedId;
-  item.classList.add("dragging");
   if (event.dataTransfer && draggedId) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", draggedId);
@@ -472,12 +472,7 @@ export function handleQueueDrop(event: DragEvent): void {
   void reorderQueue(nextIds);
 }
 
-export function handleQueueDragEnd(event: DragEvent): void {
-  const target = eventTargetElement(event);
-  const item = event.currentTarget instanceof HTMLElement && event.currentTarget.dataset.queueTaskId
-    ? event.currentTarget
-    : target?.closest("[data-queue-task-id]");
-  item?.classList.remove("dragging");
+export function handleQueueDragEnd(_event: DragEvent): void {
   getState().queueDragTaskId = null;
 }
 

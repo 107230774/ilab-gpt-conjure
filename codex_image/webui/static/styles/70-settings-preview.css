@@ -4,7 +4,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  transition: height 220ms ease;
+  transition: height var(--motion-height);
 }
 
 .settings-grid.is-size-transitioning {
@@ -61,8 +61,8 @@
   opacity: 1;
   transform: translateY(0);
   transition:
-    opacity 140ms ease,
-    transform 180ms ease;
+    opacity var(--motion-fast),
+    transform var(--motion-base);
 }
 
 .mode-transition.mode-collapsed {
@@ -135,6 +135,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .settings-grid,
   .mode-transition {
     transition: none;
   }
@@ -203,7 +204,7 @@
   right: 0;
   bottom: 0;
   background-color: #ccc;
-  transition: .2s;
+  transition: background-color var(--motion-base);
   border-radius: 22px;
 }
 
@@ -215,7 +216,7 @@
   left: 3px;
   bottom: 3px;
   background-color: white;
-  transition: .2s;
+  transition: transform var(--motion-base), background-color var(--motion-base);
   border-radius: 50%;
 }
 
@@ -246,7 +247,7 @@ input:checked + .slider.round:before {
   min-width: 0;
   padding-left: 20px;
   border-left: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
-  transition: border-color 140ms ease;
+  transition: border-color var(--motion-fast);
 }
 
 .custom-ratio-header {
@@ -365,13 +366,13 @@ input:checked + .slider.round:before {
   border-radius: 8px;
   background: var(--surface-soft);
   transition:
-    max-height 220ms ease,
-    opacity 140ms ease,
-    transform 180ms ease,
-    padding 180ms ease,
-    border-width 180ms ease,
-    border-color 140ms ease,
-    background 140ms ease;
+    max-height var(--motion-height),
+    opacity var(--motion-fast),
+    transform var(--motion-base),
+    padding var(--motion-base),
+    border-width var(--motion-base),
+    border-color var(--motion-fast),
+    background var(--motion-fast);
 }
 
 .custom-size.custom-size-collapsed {
@@ -443,7 +444,7 @@ input:checked + .slider.round:before {
   color: var(--muted);
   background: transparent;
   cursor: pointer;
-  transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 140ms ease;
+  transition: border-color var(--motion-fast), color var(--motion-fast), background var(--motion-fast), transform var(--motion-fast);
 }
 
 .custom-size-icon-button:hover,
@@ -495,8 +496,18 @@ input:checked + .slider.round:before {
 
 @media (prefers-reduced-motion: reduce) {
   .settings-grid,
+  .slider.round,
+  .slider.round:before,
+  .custom-ratio-field,
+  .custom-size-icon-button,
   .custom-size {
     transition: none;
+  }
+
+  .custom-size,
+  .custom-size.custom-size-collapsed,
+  .custom-size-icon-button:active {
+    transform: none;
   }
 }
 
@@ -673,7 +684,7 @@ input[type=range].slider::-webkit-slider-thumb {
   border-radius: 50%;
   background: var(--surface);
   box-shadow: 0 2px 8px rgba(31, 53, 47, 0.18);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: transform var(--motion-base), box-shadow var(--motion-base), border-color var(--motion-base);
 }
 
 input[type=range].slider:hover::-webkit-slider-thumb,
@@ -709,7 +720,7 @@ input[type=range].slider::-moz-range-thumb {
   border-radius: 50%;
   background: var(--surface);
   box-shadow: 0 2px 8px rgba(31, 53, 47, 0.18);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: transform var(--motion-base), box-shadow var(--motion-base), border-color var(--motion-base);
 }
 
 input[type=range].slider:hover::-moz-range-thumb,
@@ -819,8 +830,8 @@ input[type=range].slider:disabled::-moz-range-thumb {
   align-items: center;
   justify-content: center;
   transition:
-    background 160ms ease,
-    border-color 160ms ease;
+    background var(--motion-fast),
+    border-color var(--motion-fast);
 }
 
 .preview-card.is-loading-next {
@@ -879,10 +890,10 @@ input[type=range].slider:disabled::-moz-range-thumb {
   backdrop-filter: blur(8px);
   opacity: 0.78;
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    opacity 160ms ease;
+    background var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    opacity var(--motion-fast);
 }
 
 .preview-select-button[hidden],
@@ -949,11 +960,12 @@ input[type=range].slider:disabled::-moz-range-thumb {
   max-height: 100%;
   object-fit: contain;
   display: block;
-  transition: opacity 160ms ease;
+  transition: opacity var(--motion-fast);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .preview-card,
+  .preview-select-button,
   .preview-card img {
     transition: none;
   }
@@ -967,7 +979,7 @@ input[type=range].slider:disabled::-moz-range-thumb {
   padding: 12px;
   background: linear-gradient(transparent 8%, rgba(0, 0, 0, 0.78));
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity var(--motion-base);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1520,7 +1532,7 @@ body.lightbox-open {
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line));
   background:
-    radial-gradient(circle at 18% 15%, rgba(69, 123, 102, 0.14), transparent 28%),
+    radial-gradient(circle at 18% 15%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 28%),
     linear-gradient(135deg, var(--surface-soft), var(--primary-light));
   display: flex;
   flex-direction: column;
@@ -1611,7 +1623,7 @@ body.lightbox-open {
   display: flex;
   flex-direction: column;
   transform: translateY(calc(var(--digit-offset, 0) * -1em));
-  transition: transform 0.12s cubic-bezier(0.2, 0.74, 0.24, 1);
+  transition: transform var(--motion-fast);
   will-change: transform;
 }
 
@@ -1747,7 +1759,7 @@ body.lightbox-open {
   height: 6px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(69, 123, 102, 0.14);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
 }
 
 .waiting-bar span {
@@ -1776,7 +1788,7 @@ body.lightbox-open {
   box-shadow: none;
   overflow: hidden;
   transform: translateX(110%);
-  transition: transform 0.24s ease, box-shadow 0.24s ease;
+  transition: transform var(--motion-height), box-shadow var(--motion-height);
 }
 
 .queue-drawer.open {
@@ -1960,11 +1972,11 @@ body.lightbox-open {
   color: var(--text-secondary);
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  transition: background var(--motion-base), color var(--motion-base), border-color var(--motion-base);
 }
 
 .queue-item-action:hover {
-  border-color: rgba(69, 123, 102, 0.45);
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
   background: var(--primary-light);
   color: var(--primary-strong);
 }
@@ -1979,7 +1991,7 @@ body.lightbox-open {
 }
 
 .queue-item-action.danger:hover {
-  border-color: rgba(166, 70, 61, 0.35);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
   background: var(--danger-soft);
   color: var(--danger);
 }
@@ -2049,12 +2061,12 @@ body.lightbox-open {
   border-radius: 6px;
   padding: 0 8px;
   background: transparent;
-  transition: background 0.16s ease, color 0.16s ease;
+  transition: background var(--motion-fast), color var(--motion-fast);
 }
 
 .api-settings-feedback.ok {
   color: var(--primary-strong);
-  background: rgba(69, 123, 102, 0.12);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .api-settings-feedback.error {
@@ -2064,7 +2076,7 @@ body.lightbox-open {
 
 .api-settings-feedback.running {
   color: var(--primary-strong);
-  background: rgba(69, 123, 102, 0.08);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
 .gallery-drawer {
@@ -2347,7 +2359,7 @@ body.lightbox-open {
 
 .gallery-drawer-toolbar .ghost-button.active {
   border-color: var(--primary);
-  background: rgba(69, 123, 102, 0.12);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
   color: var(--primary-strong);
 }
 
@@ -2355,7 +2367,7 @@ body.lightbox-open {
   display: grid;
   align-items: start;
   overflow: hidden;
-  transition: height 220ms ease;
+  transition: height var(--motion-height);
 }
 
 .gallery-grid.is-transitioning {
@@ -2490,7 +2502,7 @@ body.lightbox-open {
 }
 
 .archive-card:hover {
-  border-color: rgba(69, 123, 102, 0.3);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
   background: var(--surface-soft);
 }
 
@@ -2730,7 +2742,7 @@ body.lightbox-open {
 
 .image-editor-swatch.active {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(69, 123, 102, 0.16);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
 }
 
 .image-editor-color {
@@ -2793,7 +2805,7 @@ body.lightbox-open {
 .image-editor-crop-box {
   position: absolute;
   border: 2px solid var(--primary);
-  background: rgba(69, 123, 102, 0.12);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
   box-shadow: 0 0 0 9999px rgba(12, 28, 23, 0.28);
   pointer-events: none;
 }
@@ -2854,7 +2866,7 @@ body.lightbox-open {
   opacity: 0.9;
   pointer-events: auto;
   box-shadow: 0 8px 18px rgba(12, 28, 23, 0.18);
-  transition: opacity 0.18s ease, background 0.18s ease, transform 0.18s ease;
+  transition: opacity var(--motion-base), background var(--motion-base), transform var(--motion-base);
   touch-action: manipulation;
 }
 
@@ -2863,7 +2875,7 @@ body.lightbox-open {
   left: 6px;
   right: auto;
   z-index: 2;
-  background: rgba(69, 123, 102, 0.9);
+  background: color-mix(in srgb, var(--primary) 90%, transparent);
 }
 
 .thumb-add-icon {
@@ -2888,7 +2900,7 @@ body.lightbox-open {
 
 .add-upload-to-gallery:hover,
 .add-upload-to-gallery:focus-visible {
-  background: rgba(69, 123, 102, 0.98);
+  background: color-mix(in srgb, var(--primary) 98%, transparent);
   transform: translateY(-1px);
 }
 
@@ -2900,9 +2912,32 @@ body.lightbox-open {
   width: fit-content;
   padding: 2px 6px;
   border-radius: 999px;
-  background: rgba(69, 123, 102, 0.86);
+  background: color-mix(in srgb, var(--primary) 86%, transparent);
   color: #fff;
   font-size: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  input[type=range].slider::-webkit-slider-thumb,
+  input[type=range].slider::-moz-range-thumb,
+  .preview-overlay,
+  .elapsed-wheel-strip,
+  .queue-drawer,
+  .queue-item-action,
+  .api-settings-feedback,
+  .gallery-grid,
+  .add-upload-to-gallery {
+    transition: none;
+  }
+
+  .add-upload-to-gallery:hover,
+  .add-upload-to-gallery:focus-visible {
+    transform: none;
+  }
+
+  .waiting-bar span {
+    animation: none;
+  }
 }
 
 .add-gallery-body {

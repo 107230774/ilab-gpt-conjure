@@ -7,6 +7,7 @@ const THEME_OPTIONS = new Set(["system", "light", "dark"]);
 const SIDEBAR_WIDTH_STORAGE_KEY = "codex-image-sidebar-width";
 const SIDEBAR_MIN_WIDTH = 280;
 const SIDEBAR_MAX_WIDTH = 520;
+const SIDEBAR_DEFAULT_WIDTH = 347;
 
 const bridge = getLegacyBridge();
 const state = bridge.state;
@@ -73,6 +74,8 @@ function bindShellUiEvents() {
   els.newTaskButton?.addEventListener("click", resetForm);
   els.sidebarResizeHandle?.addEventListener("pointerdown", startSidebarResize);
   els.sidebarResizeHandle?.addEventListener("keydown", handleSidebarResizeKeydown);
+  els.sidebarResizeHandle?.addEventListener("dblclick", resetSidebarWidth);
+  syncSidebarResizeHandleAria();
 }
 
 function normalizeThemePreference(value) {
@@ -146,9 +149,21 @@ function clampSidebarWidth(value) {
   return Math.min(sidebarMaxWidth(), Math.max(SIDEBAR_MIN_WIDTH, width));
 }
 
+function syncSidebarResizeHandleAria(width = null) {
+  const handle = els.sidebarResizeHandle;
+  if (!handle) return;
+  const currentWidth = width !== null
+    ? width
+    : Math.round(els.sidebar?.getBoundingClientRect().width || SIDEBAR_DEFAULT_WIDTH);
+  handle.setAttribute("aria-valuemin", String(SIDEBAR_MIN_WIDTH));
+  handle.setAttribute("aria-valuemax", String(SIDEBAR_MAX_WIDTH));
+  handle.setAttribute("aria-valuenow", String(currentWidth));
+}
+
 function applySidebarWidth(width, { persist = true } = {}) {
   const nextWidth = clampSidebarWidth(width);
   document.documentElement.style.setProperty("--sidebar-width", `${nextWidth}px`);
+  syncSidebarResizeHandleAria(nextWidth);
   if (persist) {
     try {
       localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(nextWidth));
@@ -157,6 +172,10 @@ function applySidebarWidth(width, { persist = true } = {}) {
     }
   }
   schedulePreviewPanelHeightSync();
+}
+
+function resetSidebarWidth() {
+  applySidebarWidth(SIDEBAR_DEFAULT_WIDTH);
 }
 
 function startSidebarResize(event) {
@@ -287,6 +306,7 @@ function resetForm() {
   state.images = [];
   state.batchMode = false;
   state.batchSelectedTaskIds = [];
+  state.batchSelectionAnchorTaskId = null;
   finishBatchMarqueeSelection();
   setPromptText("");
   if (els.customSizeToggle) els.customSizeToggle.checked = false;
@@ -336,6 +356,8 @@ export function initShellUiFeature() {
     sidebarMaxWidth,
     clampSidebarWidth,
     applySidebarWidth,
+    resetSidebarWidth,
+    syncSidebarResizeHandleAria,
     startSidebarResize,
     updateSidebarResize,
     finishSidebarResize,

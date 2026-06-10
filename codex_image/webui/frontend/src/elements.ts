@@ -36,6 +36,7 @@ export function createWebUIElements(): WebUIElements {
   taskResolutionFilter: document.querySelector("#taskResolutionFilter"),
   taskHistoryTopAnchors: document.querySelector("#taskHistoryTopAnchors"),
   taskHistoryBottomAnchors: document.querySelector("#taskHistoryBottomAnchors"),
+  taskHistoryLibrarySlot: document.querySelector("#taskHistoryLibrarySlot"),
   archiveButton: document.querySelector("#archiveButton"),
   batchManageButton: document.querySelector("#batchManageButton"),
   settingsButton: document.querySelector("#settingsButton"),

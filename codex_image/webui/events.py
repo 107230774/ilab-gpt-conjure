@@ -44,19 +44,9 @@ def queue_snapshot(ctx: WebUIContext) -> dict[str, Any]:
 
 
 def event_snapshot(ctx: WebUIContext) -> dict[str, Any]:
-    active_ids = ctx.route_helpers["visible_running_task_ids"]()
     return {
         "type": "snapshot",
-        "tasks": [
-            _with_file_urls(
-                task,
-                active_ids,
-                ctx.gallery_storage,
-                ctx.reference_asset_storage,
-                include_request=False,
-            )
-            for task in ctx.storage.list_tasks()
-        ],
+        "tasks": ctx.storage.list_recent_task_cards(limit=200),
         "queue": queue_snapshot(ctx),
         "gallery": [_gallery_item_response(item) for item in ctx.gallery_storage.list_items()],
         "auth": ctx.route_helpers["auth_event_payload"](),

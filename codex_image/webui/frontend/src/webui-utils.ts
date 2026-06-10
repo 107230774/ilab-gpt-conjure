@@ -16,3 +16,7 @@ export function cssEscape(value: unknown): string {
 export function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message || fallback : fallback;
 }
+
+export function prefersReducedMotion(): boolean {
+  return Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+}

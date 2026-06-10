@@ -1,5 +1,6 @@
 import { getLegacyBridge } from "./state";
 import { formatTranslation } from "./i18n";
+import { prefersReducedMotion } from "./webui-utils";
 
 const QUICK_GALLERY_WHEEL_COOLDOWN_MS = 220;
 const bridge = getLegacyBridge();
@@ -168,6 +169,7 @@ function handleQuickGalleryBoundaryWheel(event: any) {
 
 function triggerQuickGalleryBounce(direction: any) {
   if (!els.quickGalleryList) return;
+  if (prefersReducedMotion()) return;
   const className = direction === "bottom" ? "bounce-bottom" : "bounce-top";
   els.quickGalleryList.classList.remove("bounce-top", "bounce-bottom");
   void els.quickGalleryList.offsetHeight;
@@ -200,12 +202,13 @@ function scrollQuickGalleryItemToFocus(button: any, behavior: any = "smooth") {
   const maxScrollTop = Math.max(0, list.scrollHeight - list.clientHeight);
   list.scrollTo({
     top: Math.max(0, Math.min(maxScrollTop, targetTop)),
-    behavior,
+    behavior: prefersReducedMotion() ? "auto" : behavior,
   });
   scheduleQuickGalleryFocusUpdate();
 }
 
 function animateGalleryItemToInput(item: any, fromEl: any) {
+  if (prefersReducedMotion()) return;
   if (!item?.image_url || !fromEl || !els.imageStrip) return;
   const sourceRect = (els.quickGalleryPreview?.classList.contains("visible") ? els.quickGalleryPreview : fromEl).getBoundingClientRect();
   const targetRect = (els.imageStrip.querySelector(".thumb:last-child") || els.imageUploadSource || els.imageStrip).getBoundingClientRect();

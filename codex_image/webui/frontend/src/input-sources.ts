@@ -3,6 +3,7 @@ import { formatTranslation, LOCALE_CHANGE_EVENT, translate } from "./i18n";
 import { getLegacyBridge, getState } from "./state";
 
 let inputSourcesFeatureInitialized = false;
+const HISTORY_REFERENCE_HANDOFF_KEY = "codex-image-history-reference-handoff";
 
 function legacyMethod(name: string, ...args: any[]) {
   return getLegacyBridge().methods[name]?.(...args);
@@ -412,6 +413,29 @@ async function addCollectedReferencesToInput() {
   }
 }
 
+async function restoreHistoryReferenceHandoff() {
+  let raw = "";
+  try {
+    raw = localStorage.getItem(HISTORY_REFERENCE_HANDOFF_KEY) || "";
+    if (!raw) return;
+    localStorage.removeItem(HISTORY_REFERENCE_HANDOFF_KEY);
+    const parsed = JSON.parse(raw);
+    const items = Array.isArray(parsed) ? parsed : [];
+    const files: File[] = [];
+    for (const [index, item] of items.entries()) {
+      if (!item?.url) continue;
+      files.push(await imageFileFromUrl(item.url, `history-reference-${index + 1}.png`));
+    }
+    if (!files.length) return;
+    addImageFiles(files, {
+      successMessage: (count: number) => formatTranslation("referenceCollector.added", { count }),
+    });
+  } catch (error: any) {
+    localStorage.removeItem(HISTORY_REFERENCE_HANDOFF_KEY);
+    setStatus(error.message || translate("referenceCollector.addFailed"), "error");
+  }
+}
+
 function bindInputSourceEvents() {
   const els = getEls();
   els.pasteClipboardButton?.addEventListener("click", pasteClipboardImages);
@@ -445,5 +469,6 @@ export function initInputSourcesFeature() {
     collectReferenceOutput,
     renderReferenceCollector,
     imageFileFromUrl,
+    restoreHistoryReferenceHandoff,
   });
 }

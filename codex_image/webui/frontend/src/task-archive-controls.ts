@@ -110,10 +110,7 @@ async function migrateLegacyArchivedTasks() {
 
 function renderArchiveButton() {
   if (!els.archiveButton) return;
-  const count = state.tasks.filter((task) => isTaskArchived(task.task_id)).length;
-  els.archiveButton.textContent = count
-    ? formatTranslation("footer.archiveCount", { count })
-    : translate("footer.archive");
+  els.archiveButton.textContent = translate("footer.historyLibrary");
 }
 
 async function restoreArchivedTask(taskId: any) {

@@ -54,11 +54,11 @@
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: background var(--motion-base), border-color var(--motion-base), box-shadow var(--motion-base);
 }
 
 .queue-button:hover {
-  border-color: rgba(69, 123, 102, 0.45);
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
   background: var(--primary-light);
   box-shadow: 0 3px 10px rgba(40, 116, 85, 0.1);
 }
@@ -293,7 +293,7 @@
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease;
+  transition: background var(--motion-base), color var(--motion-base);
 }
 
 .theme-option:hover,
@@ -342,7 +342,7 @@
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease;
+  transition: background var(--motion-base), color var(--motion-base);
 }
 
 .language-option:hover,
@@ -416,7 +416,7 @@
   padding: 0 13px;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  transition: background var(--motion-base), color var(--motion-base), box-shadow var(--motion-base);
 }
 
 .auth-source-button.active {
@@ -449,16 +449,26 @@
   background: color-mix(in srgb, var(--surface-soft) 72%, transparent);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  transition: background var(--motion-base), border-color var(--motion-base), color var(--motion-base), box-shadow var(--motion-base);
 }
 
 .auth-source-settings-button:hover,
 .auth-source-settings-button:focus-visible {
-  border-color: rgba(69, 123, 102, 0.45);
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
   background: var(--primary-light);
   color: var(--primary-strong);
   box-shadow: 0 3px 10px rgba(40, 116, 85, 0.1);
   outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-button,
+  .theme-option,
+  .language-option,
+  .auth-source-button,
+  .auth-source-settings-button {
+    transition: none;
+  }
 }
 
 .api-provider-quick {

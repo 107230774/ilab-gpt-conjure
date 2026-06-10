@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>历史库 - iLab GPT CONJURE</title>
+  <link rel="stylesheet" href="/static/styles.css?v=runtime-269" />
+</head>
+<body>
+  <main class="history-page">
+    <aside class="history-sidebar">
+      <a class="history-back-link" href="/" data-i18n="history.back">返回生成页</a>
+      <div class="history-brand">
+        <strong data-i18n="history.title">历史库</strong>
+        <span id="historyTotal" data-i18n="history.loading">载入中</span>
+      </div>
+      <label class="history-search-label" for="historySearch" data-i18n="history.search">搜索</label>
+      <div class="history-search-row">
+        <input id="historySearch" class="control" type="search" autocomplete="off" placeholder="搜索提示词" data-i18n-attr="placeholder:history.searchPlaceholder" />
+        <button id="historySearchClear" class="ghost-button text-sm" type="button" data-i18n="history.clear">清空</button>
+      </div>
+      <div class="history-filter-block">
+        <h2 data-i18n="history.month">月份</h2>
+        <div id="historyMonthList" class="history-filter-list"></div>
+      </div>
+      <div class="history-filter-block">
+        <h2 data-i18n="history.promptMode">提示词模式</h2>
+        <div id="historyPromptModeList" class="history-filter-list"></div>
+      </div>
+      <div class="history-filter-block">
+        <h2 data-i18n="history.quality">质量</h2>
+        <div id="historyQualityList" class="history-filter-list"></div>
+      </div>
+      <div class="history-filter-block">
+        <h2 data-i18n="history.ratio">比例</h2>
+        <div id="historyRatioList" class="history-filter-list"></div>
+      </div>
+      <div class="history-filter-block">
+        <h2 data-i18n="history.orientation">方向</h2>
+        <div id="historyOrientationList" class="history-filter-list"></div>
+      </div>
+      <div class="history-filter-block">
+        <h2 data-i18n="history.backend">后端</h2>
+        <div id="historyBackendList" class="history-filter-list"></div>
+      </div>
+      <div class="history-filter-block">
+        <h2 data-i18n="history.provider">供应商</h2>
+        <div id="historyProviderList" class="history-filter-list"></div>
+      </div>
+      <div class="history-filter-block">
+        <h2 data-i18n="history.archived">归档</h2>
+        <div id="historyArchiveList" class="history-filter-list">
+          <button class="history-filter-button active" type="button" data-history-archived="" data-i18n="history.all">全部</button>
+          <button class="history-filter-button" type="button" data-history-archived="false" data-i18n="history.unarchived">未归档</button>
+          <button class="history-filter-button" type="button" data-history-archived="true" data-i18n="history.archivedOnly">已归档</button>
+        </div>
+      </div>
+    </aside>
+    <section class="history-results" aria-label="历史任务" data-i18n-attr="aria-label:history.tasksAria">
+      <header class="history-toolbar">
+        <div>
+          <h1 data-i18n="history.taskListTitle">历史任务</h1>
+          <p id="historyResultSummary" data-i18n="history.browseNewest">按时间倒序浏览</p>
+        </div>
+        <div class="history-toolbar-actions">
+          <div id="historyViewToggle" class="history-view-toggle" aria-label="视图" data-i18n-attr="aria-label:history.view">
+            <button class="history-view-button active" type="button" data-history-view="grid" aria-pressed="true" data-i18n="history.grid">网格</button>
+            <button class="history-view-button" type="button" data-history-view="list" aria-pressed="false" data-i18n="history.list">列表</button>
+          </div>
+          <label class="history-sort-label" for="historySort">
+            <span data-i18n="history.sort">排序</span>
+            <select id="historySort" class="control">
+              <option value="newest" data-i18n="history.newest">最新优先</option>
+              <option value="oldest" data-i18n="history.oldest">最早优先</option>
+            </select>
+          </label>
+          <button id="historyRefreshButton" class="ghost-button text-sm" type="button" data-i18n="history.refresh">刷新</button>
+        </div>
+      </header>
+      <div id="historyBulkToolbar" class="history-bulk-toolbar hidden" hidden>
+        <span id="historyBulkCount">已选择 0 个任务</span>
+        <div class="history-bulk-actions">
+          <button id="historyBulkArchiveButton" class="ghost-button text-sm" type="button" data-i18n="action.archive">归档</button>
+          <button id="historyBulkRestoreButton" class="ghost-button text-sm" type="button" data-i18n="archive.restore">恢复</button>
+          <button id="historyBulkDeleteButton" class="ghost-button text-sm danger-button" type="button" data-i18n="action.delete">删除</button>
+          <button id="historyBulkDeleteCancelButton" class="ghost-button text-sm hidden" type="button" data-i18n="action.cancel">取消</button>
+        </div>
+      </div>
+      <div id="historyTaskList" class="history-task-list history-view-grid" role="listbox" aria-live="polite"></div>
+      <div id="historyLoadSentinel" class="history-load-sentinel" data-history-load-more role="status" aria-live="polite" hidden></div>
+    </section>
+    <aside id="historyDetail" class="history-detail" aria-live="polite">
+      <div class="history-detail-header">
+        <div>
+          <p class="history-detail-kicker" data-i18n="history.detail">任务详情</p>
+          <h2 class="history-detail-title" data-i18n="history.detailTitle">历史任务</h2>
+        </div>
+        <button id="historyDetailClose" class="drawer-close-button history-detail-close" type="button" data-history-detail-close aria-label="关闭任务详情" data-i18n-attr="aria-label:history.closeDetail">×</button>
+      </div>
+      <div class="history-detail-empty" data-i18n="history.detailEmpty">选择一个历史任务查看详情</div>
+    </aside>
+  </main>
+  <script src="/static/history.js?v=history-12"></script>
+</body>
+</html>

@@ -277,6 +277,16 @@ def create_app(
             headers={"Cache-Control": "no-store"},
         )
 
+    @app.get("/history", response_model=None)
+    def history() -> Response:
+        history_path = static_path / "history.html"
+        if history_path.exists():
+            return FileResponse(history_path, headers={"Cache-Control": "no-store"})
+        return HTMLResponse(
+            "<!doctype html><title>History - iLab GPT CONJURE</title><h1>History</h1>",
+            headers={"Cache-Control": "no-store"},
+        )
+
     ctx.route_helpers.update(
         {
             "ensure_queue_worker_running": queue_runtime.ensure_queue_worker_running,

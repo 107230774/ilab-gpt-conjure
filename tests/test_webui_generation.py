@@ -136,12 +136,16 @@ class WebUIGenerationTests(unittest.TestCase):
             app = create_app(output_root=Path(tmp), auth_checker=lambda: True, auto_start_queue=False)
             client = TestClient(app)
             index_response = client.get("/")
+            history_response = client.get("/history")
             script_response = client.get("/static/app.js")
 
         self.assertEqual(index_response.status_code, 200)
+        self.assertEqual(history_response.status_code, 200)
         self.assertEqual(script_response.status_code, 200)
         self.assertEqual(index_response.headers["cache-control"], "no-store")
+        self.assertEqual(history_response.headers["cache-control"], "no-store")
         self.assertEqual(script_response.headers["cache-control"], "no-store")
+        self.assertIn("/static/history.js", history_response.text)
     def test_generate_route_omits_png_compression(self) -> None:
         from codex_image.webui.app import create_app
 

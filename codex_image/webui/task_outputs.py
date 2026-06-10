@@ -11,7 +11,7 @@ from codex_image.client import ImageResult
 
 from .storage import TaskStorage, utc_now
 from .task_enrichment import _input_sources, _input_urls
-from .thumbnails import create_image_thumbnail
+from .thumbnails import create_image_thumbnail, thumbnail_needs_refresh
 
 
 def _normalize_api_images_concurrency_for_metadata(value: Any) -> int:
@@ -245,7 +245,7 @@ def _output_url(storage: TaskStorage, path: Path) -> str:
 
 def _output_thumbnail_fields(storage: TaskStorage, task_id: str, output_index: int, output_path: Path) -> dict[str, str]:
     thumbnail_path = storage.output_thumbnail_path(task_id, output_index)
-    if not thumbnail_path.exists():
+    if thumbnail_needs_refresh(output_path, thumbnail_path):
         create_image_thumbnail(output_path, thumbnail_path)
     if not thumbnail_path.exists():
         return {}

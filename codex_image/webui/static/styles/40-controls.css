@@ -13,7 +13,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: background 0.2s;
+  transition: background var(--motion-base);
 }
 
 .primary-button:hover {
@@ -53,7 +53,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: background 0.2s;
+  transition: background var(--motion-base);
 }
 
 .run-button:hover {
@@ -97,7 +97,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition:
+    background var(--motion-base),
+    border-color var(--motion-base),
+    color var(--motion-base),
+    box-shadow var(--motion-base);
 }
 
 .ghost-button:hover {
@@ -191,7 +195,7 @@ svg.button-icon {
   color: var(--text);
   font-size: 13px;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color var(--motion-base);
 }
 
 .control:focus {
@@ -309,7 +313,10 @@ svg.button-icon {
   border-radius: 4px;
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition:
+    background var(--motion-base),
+    color var(--motion-base),
+    box-shadow var(--motion-base);
 }
 
 .segment.active {
@@ -411,10 +418,10 @@ svg.button-icon {
   line-height: 1;
   cursor: pointer;
   transition:
-    background-color 180ms ease,
-    color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
+    background-color var(--motion-base),
+    color var(--motion-base),
+    box-shadow var(--motion-base),
+    transform var(--motion-base);
 }
 
 .ratio-group .radio-btn {
@@ -457,10 +464,10 @@ svg.button-icon {
   pointer-events: none;
   transform: translate3d(var(--segmented-indicator-x), var(--segmented-indicator-y), 0);
   transition:
-    transform 180ms ease,
-    width 180ms ease,
-    height 180ms ease,
-    opacity 140ms ease;
+    transform var(--motion-base),
+    width var(--motion-base),
+    height var(--motion-base),
+    opacity var(--motion-fast);
   z-index: 0;
 }
 
@@ -487,6 +494,14 @@ svg.button-icon {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .primary-button,
+  .run-button,
+  .ghost-button,
+  .control,
+  .segment,
+  .slider.round,
+  .slider.round:before,
+  .radio-btn,
   .ratio-group .radio-btn,
   .segmented-indicator {
     transition: none;

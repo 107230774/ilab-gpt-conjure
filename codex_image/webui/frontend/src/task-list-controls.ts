@@ -24,10 +24,10 @@ const archiveTask = (...args: any[]) => legacyMethod("archiveTask", ...args);
 const openTaskDeleteConfirm = (...args: any[]) => legacyMethod("openTaskDeleteConfirm", ...args);
 const toggleBatchMode = (...args: any[]) => legacyMethod("toggleBatchMode", ...args);
 const toggleBatchTaskSelection = (...args: any[]) => legacyMethod("toggleBatchTaskSelection", ...args);
+const handleBatchTaskShortcutSelection = (...args: any[]) => legacyMethod("handleBatchTaskShortcutSelection", ...args);
 const archiveSelectedTasks = (...args: any[]) => legacyMethod("archiveSelectedTasks", ...args);
 const openBatchDeleteConfirm = (...args: any[]) => legacyMethod("openBatchDeleteConfirm", ...args);
 const handleTaskListPointerDown = (...args: any[]) => legacyMethod("handleTaskListPointerDown", ...args);
-const openArchiveModal = (...args: any[]) => legacyMethod("openArchiveModal", ...args);
 const closeArchiveModal = (...args: any[]) => legacyMethod("closeArchiveModal", ...args);
 
 let taskListControlsInitialized = false;
@@ -37,7 +37,6 @@ function bindTaskListControlEvents() {
   if (taskListControlEventsBound) return;
   taskListControlEventsBound = true;
 
-  els.archiveButton?.addEventListener("click", openArchiveModal);
   els.archiveModalClose?.addEventListener("click", closeArchiveModal);
   els.archiveModal?.addEventListener("click", (event: any) => {
     if (event.target === els.archiveModal) closeArchiveModal();
@@ -135,6 +134,7 @@ function handleTaskListClick(event: any) {
   const card = event.target.closest(".task-card[data-task-id]");
   const root = taskHistoryInteractiveRoot();
   if (!card || !root?.contains(card)) return;
+  if (handleBatchTaskShortcutSelection(card.dataset.taskId, event)) return;
   if (state.batchMode) {
     toggleBatchTaskSelection(card.dataset.taskId);
     return;
@@ -148,6 +148,7 @@ function handleTaskListKeydown(event: any) {
   const root = taskHistoryInteractiveRoot();
   if (!card || !root?.contains(card) || event.target.closest("button")) return;
   event.preventDefault();
+  if (handleBatchTaskShortcutSelection(card.dataset.taskId, event)) return;
   if (state.batchMode) {
     toggleBatchTaskSelection(card.dataset.taskId);
   } else {

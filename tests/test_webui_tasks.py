@@ -58,6 +58,128 @@ class WebUITaskTests(unittest.TestCase):
         image.save(buffer, format="PNG")
         return buffer.getvalue()
 
+    def test_task_history_api_returns_summary_and_cursor_pages(self) -> None:
+        from codex_image.webui.app import create_app
+        from codex_image.webui.storage import TaskStorage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = create_app(output_root=root, auth_checker=lambda: True, auto_start_queue=False)
+            storage = TaskStorage(root, input_root=root / "inputs", source_data_root=root / "source-data")
+            for index, task_id in enumerate(["20260510101010-bbbbbbbb", "20260510101010-aaaaaaaa", "20260409101010-cccccccc"]):
+                metadata = {
+                    "task_id": task_id,
+                    "created_at": "2026-05-10T10:10:10+00:00" if index < 2 else "2026-04-09T10:10:10+00:00",
+                    "updated_at": "2026-05-10T10:11:10+00:00" if index < 2 else "2026-04-09T10:11:10+00:00",
+                    "status": "completed" if index != 1 else "failed",
+                    "mode": "generate",
+                    "prompt": "green portrait searchable" if index == 0 else "square product",
+                    "prompt_for_model": "expanded hidden searchable text" if index == 0 else "",
+                    "params": {
+                        "size": "1152x2048" if index == 0 else "1024x1024",
+                        "quality": "high" if index == 0 else "low",
+                        "ratio": "9:16" if index == 0 else "1:1",
+                        "orientation": "portrait" if index == 0 else "square",
+                        "prompt_fidelity": "strict" if index == 0 else "original",
+                    },
+                    "backend": "openai_images" if index == 0 else "codex_responses",
+                    "api_provider_name": "openai" if index == 0 else "codex",
+                    "outputs": [{"index": 1, "status": "completed", "thumbnail_url": f"/thumb-{index}.jpg"}],
+                    "generated_count": 1 if index != 1 else 0,
+                    "failed_count": 0 if index != 1 else 1,
+                    "total_count": 1,
+                }
+                if index == 1:
+                    metadata["archived_at"] = "2026-05-11T00:00:00+00:00"
+                storage.write_metadata(task_id, metadata)
+
+            client = TestClient(app)
+            summary = client.get("/api/task-history/summary").json()
+            first = client.get("/api/task-history/tasks", params={"month": "2026-05", "limit": 1}).json()
+            second = client.get("/api/task-history/tasks", params={"month": "2026-05", "limit": 2, "cursor": first["next_cursor"]}).json()
+            visible = client.get("/api/task-history/tasks", params={"month": "2026-05", "limit": 10, "archived": "false"}).json()
+            searched = client.get("/api/task-history/tasks", params={"q": "hidden searchable", "limit": 10}).json()
+            backend = client.get("/api/task-history/tasks", params={"backend": "openai_images", "limit": 10}).json()
+            provider = client.get("/api/task-history/tasks", params={"provider": "openai", "limit": 10}).json()
+            prompt_mode = client.get("/api/task-history/tasks", params={"prompt_mode": "strict", "limit": 10}).json()
+            size = client.get("/api/task-history/tasks", params={"size": "1152x2048", "limit": 10}).json()
+            quality = client.get("/api/task-history/tasks", params={"quality": "high", "limit": 10}).json()
+            oldest = client.get("/api/task-history/tasks", params={"sort": "oldest", "limit": 1}).json()
+            recent = client.get("/api/tasks/recent", params={"limit": 1}).json()
+
+        self.assertEqual(summary["total"], 3)
+        self.assertEqual(summary["archived_total"], 1)
+        self.assertEqual(summary["months"][0], {"month": "2026-05", "count": 2})
+        self.assertEqual([task["task_id"] for task in first["tasks"]], ["20260510101010-bbbbbbbb"])
+        self.assertIsNotNone(first["next_cursor"])
+        self.assertEqual([task["task_id"] for task in second["tasks"]], ["20260510101010-aaaaaaaa"])
+        self.assertIsNone(second["next_cursor"])
+        self.assertEqual([task["task_id"] for task in visible["tasks"]], ["20260510101010-bbbbbbbb"])
+        self.assertEqual([task["task_id"] for task in searched["tasks"]], ["20260510101010-bbbbbbbb"])
+        self.assertIn({"value": "openai", "count": 1}, summary["providers"])
+        self.assertIn({"value": "strict", "count": 1}, summary["prompt_modes"])
+        self.assertIn({"value": "1152x2048", "count": 1}, summary["sizes"])
+        self.assertIn({"value": "high", "count": 1}, summary["qualities"])
+        self.assertEqual([task["task_id"] for task in backend["tasks"]], ["20260510101010-bbbbbbbb"])
+        self.assertEqual([task["task_id"] for task in provider["tasks"]], ["20260510101010-bbbbbbbb"])
+        self.assertEqual([task["task_id"] for task in prompt_mode["tasks"]], ["20260510101010-bbbbbbbb"])
+        self.assertEqual([task["task_id"] for task in size["tasks"]], ["20260510101010-bbbbbbbb"])
+        self.assertEqual([task["task_id"] for task in quality["tasks"]], ["20260510101010-bbbbbbbb"])
+        self.assertEqual(first["tasks"][0]["prompt_mode"], "strict")
+        self.assertEqual(first["tasks"][0]["quality"], "high")
+        self.assertEqual([task["task_id"] for task in oldest["tasks"]], ["20260409101010-cccccccc"])
+        self.assertNotIn("outputs", first["tasks"][0])
+        self.assertNotIn("prompt_for_model", first["tasks"][0])
+        self.assertEqual(len(recent["tasks"]), 1)
+        self.assertEqual(recent["tasks"][0]["task_id"], "20260510101010-bbbbbbbb")
+
+    def test_recent_tasks_api_returns_lightweight_sidebar_cards(self) -> None:
+        from codex_image.webui.app import create_app
+        from codex_image.webui.storage import TaskStorage
+
+        task_id = "20260510101010-aaaaaaaa"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = create_app(output_root=root, auth_checker=lambda: True, auto_start_queue=False)
+            storage = TaskStorage(root, input_root=root / "inputs", source_data_root=root / "source-data")
+            storage.write_metadata(
+                task_id,
+                {
+                    "task_id": task_id,
+                    "created_at": "2026-05-10T10:10:10+00:00",
+                    "updated_at": "2026-05-10T10:11:10+00:00",
+                    "viewed_at": "2026-05-10T10:10:30+00:00",
+                    "status": "completed",
+                    "mode": "generate",
+                    "prompt": "sidebar card prompt",
+                    "prompt_for_model": "expanded prompt should not ship to the main sidebar",
+                    "params": {"size": "1152x2048", "n": 2},
+                    "outputs": [
+                        {"index": 1, "status": "completed", "url": output_url(task_id, 1), "thumbnail_url": "/thumb-1.jpg"},
+                        {"index": 2, "status": "completed", "url": output_url(task_id, 2), "thumbnail_url": "/thumb-2.jpg"},
+                    ],
+                    "generated_count": 2,
+                    "failed_count": 0,
+                    "total_count": 2,
+                },
+            )
+
+            client = TestClient(app)
+            response = client.get("/api/tasks/recent", params={"limit": 10})
+
+        self.assertEqual(response.status_code, 200)
+        task = response.json()["tasks"][0]
+        self.assertEqual(task["task_id"], task_id)
+        self.assertEqual(task["prompt"], "sidebar card prompt")
+        self.assertEqual(task["output_size"], "1152x2048")
+        self.assertEqual(task["thumbnail_urls"], [f"/api/tasks/{task_id}/outputs/1/thumbnail"])
+        self.assertEqual(task["generated_count"], 2)
+        self.assertTrue(task["summary_only"])
+        self.assertNotIn("outputs", task)
+        self.assertNotIn("output_urls", task)
+        self.assertNotIn("prompt_for_model", task)
+        self.assertNotIn("request", task)
+
     def test_task_outputs_zip_downloads_multiple_outputs(self) -> None:
         from codex_image.webui.app import create_app
 
@@ -274,6 +396,45 @@ class WebUITaskTests(unittest.TestCase):
         self.assertEqual(thumbnail_response.headers["content-type"], "image/jpeg")
         self.assertLess(len(thumbnail_response.content), original_size)
         self.assertTrue(thumbnail_file_exists)
+
+    def test_task_thumbnail_route_refreshes_small_cached_thumbnail(self) -> None:
+        from codex_image.webui.app import create_app
+
+        task_id = "20260505010203-abcdef01"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output_file = output_name(task_id, 1)
+            output_path = root / output_file
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(self._png_bytes((400, 640)))
+            thumbnail_path = root / "thumbnails" / "2026-05-05" / f"{task_id}-image-1-thumb.jpg"
+            thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", (96, 96), (120, 180, 160)).save(thumbnail_path, format="JPEG")
+            metadata_path(root, task_id).parent.mkdir(parents=True, exist_ok=True)
+            metadata_path(root, task_id).write_text(
+                json.dumps(
+                    {
+                        "task_id": task_id,
+                        "status": "completed",
+                        "generated_count": 1,
+                        "total_count": 1,
+                        "output_file": output_file,
+                        "output_files": [output_file],
+                        "output_url": output_url(task_id, 1),
+                        "output_urls": [output_url(task_id, 1)],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            app = create_app(output_root=root, auth_checker=lambda: True, auto_start_queue=False)
+            client = TestClient(app)
+            thumbnail_response = client.get(f"/api/tasks/{task_id}/outputs/1/thumbnail")
+            with Image.open(thumbnail_path) as refreshed:
+                refreshed_size = refreshed.size
+
+        self.assertEqual(thumbnail_response.status_code, 200)
+        self.assertEqual(max(refreshed_size), 640)
 
     def test_task_input_thumbnail_route_backfills_legacy_input_thumbnail(self) -> None:
         from codex_image.webui.app import create_app

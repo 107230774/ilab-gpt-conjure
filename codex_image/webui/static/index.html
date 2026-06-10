@@ -36,7 +36,7 @@
         document.documentElement.dataset.locale = locale;
       })();
     </script>
-    <link rel="stylesheet" href="/static/styles.css?v=runtime-251" />
+    <link rel="stylesheet" href="/static/styles.css?v=runtime-269" />
   </head>
   <body>
     <div class="layout-container">
@@ -130,6 +130,7 @@
             aria-label="底部时间导航"
             data-i18n-attr="aria-label:sidebar.bottomAnchors"
           ></div>
+          <div id="taskHistoryLibrarySlot" class="task-history-library-slot hidden"></div>
         </div>
 
         <div class="sidebar-footer">
@@ -143,7 +144,6 @@
           </div>
           <div id="statusText" class="status-text" aria-live="polite" data-i18n="status.waiting">等待任务</div>
           <div class="footer-actions">
-            <button id="archiveButton" class="ghost-button icon-button" type="button" data-i18n="footer.archive">会话归档</button>
             <button id="batchManageButton" class="ghost-button icon-button" type="button" data-i18n="footer.batch">批量管理</button>
             <button id="settingsButton" class="ghost-button icon-button" type="button" data-i18n="footer.storage">存储设置</button>
           </div>
@@ -981,7 +981,7 @@
     </div>
 
     <div id="taskNotificationToastRegion" class="task-notification-toast-region" aria-live="polite"></div>
-  <script src="/static/app.js?v=runtime-251"></script>
+  <script src="/static/app.js?v=runtime-269"></script>
     <script>
       (() => {
         document.querySelectorAll(".radio-group").forEach((group) => {

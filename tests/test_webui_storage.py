@@ -56,6 +56,66 @@ class WebUIStorageTests(unittest.TestCase):
         self.assertEqual(tasks[0]["task_id"], task.task_id)
         self.assertEqual(tasks[0]["prompt"], "indexed")
 
+    def test_history_queries_refresh_stale_completed_index_rows(self) -> None:
+        from codex_image.webui.storage import TaskStorage
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            storage = TaskStorage(input_root=root / "inputs", output_root=root / "outputs", source_data_root=root / "outputs" / "source-data")
+            task = storage.create_task("generate")
+            created_at = "2026-06-10T14:28:14+00:00"
+            storage.write_metadata(
+                task.task_id,
+                {
+                    "task_id": task.task_id,
+                    "created_at": created_at,
+                    "updated_at": created_at,
+                    "status": "completed",
+                    "prompt": "stale card",
+                    "params": {"size": "1536x1024"},
+                    "generated_count": 0,
+                    "total_count": 0,
+                },
+            )
+            output_path = storage.write_output(task.task_id, _png_bytes((1536, 1024)), "png", index=1)
+            final_metadata = {
+                "task_id": task.task_id,
+                "created_at": created_at,
+                "updated_at": "2026-06-10T14:29:25+00:00",
+                "status": "completed",
+                "prompt": "stale card",
+                "params": {"size": "1536x1024"},
+                "generated_count": 1,
+                "failed_count": 0,
+                "total_count": 1,
+                "output_file": storage.output_file(output_path),
+                "output_files": [storage.output_file(output_path)],
+                "output_url": f"/outputs/{storage.output_file(output_path)}",
+                "output_urls": [f"/outputs/{storage.output_file(output_path)}"],
+                "outputs": [
+                    {
+                        "index": 1,
+                        "status": "completed",
+                        "file": storage.output_file(output_path),
+                        "url": f"/outputs/{storage.output_file(output_path)}",
+                        "size": "1536x1024",
+                    }
+                ],
+            }
+            storage.metadata_path(task.task_id).write_text(json.dumps(final_metadata), encoding="utf-8")
+
+            page = storage.query_task_history(limit=10)
+            summary = storage.task_history_summary()
+
+        self.assertEqual(page["tasks"][0]["task_id"], task.task_id)
+        self.assertEqual(page["tasks"][0]["generated_count"], 1)
+        self.assertEqual(page["tasks"][0]["total_count"], 1)
+        self.assertEqual(page["tasks"][0]["thumbnail_url"], f"/api/tasks/{task.task_id}/outputs/1/thumbnail")
+        self.assertEqual(page["tasks"][0]["ratio"], "3:2")
+        self.assertEqual(page["tasks"][0]["orientation"], "landscape")
+        self.assertIn({"value": "3:2", "count": 1}, summary["ratios"])
+        self.assertIn({"value": "landscape", "count": 1}, summary["orientations"])
+
     def test_writes_request_input_and_dated_output_to_separate_roots(self) -> None:
         from codex_image.webui.storage import TaskStorage
 

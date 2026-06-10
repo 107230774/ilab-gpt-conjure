@@ -53,7 +53,69 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         self.assertRegex(styles, r"\.task-group-items\s*\{[^}]*transition:")
         self.assertRegex(
             styles,
-            r"@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.task-history-anchor-row\s*,[\s\S]*\.task-group-header-split\s*,[\s\S]*\.task-group-items\s*\{[\s\S]*transition:\s*none",
+            r"@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.task-history-anchor-row\s*,[\s\S]*\.task-group-header-split\s*,[\s\S]*\.task-group-items\s*,[\s\S]*\.task-card\s*,[\s\S]*\.task-queue-actions\s*,[\s\S]*\.task-thumb-stack img\s*,[\s\S]*\.task-group-toggle\s*,[\s\S]*transition:\s*none",
+        )
+
+    def test_motion_tokens_are_defined_and_sidebar_avoids_transition_all(self) -> None:
+        tokens = Path("codex_image/webui/static/styles/00-tokens.css").read_text(encoding="utf-8")
+        sidebar = Path("codex_image/webui/static/styles/10-sidebar.css").read_text(encoding="utf-8")
+        tasks = Path("codex_image/webui/static/styles/20-tasks.css").read_text(encoding="utf-8")
+        styles = Path("codex_image/webui/static/styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("--motion-fast: 140ms ease;", tokens)
+        self.assertIn("--motion-base: 180ms ease;", tokens)
+        self.assertIn("--motion-height: 220ms ease;", tokens)
+        self.assertIn("--motion-base: 180ms ease;", styles)
+        self.assertNotRegex(sidebar, r"transition:\s*all")
+        self.assertNotRegex(tasks, r"transition:\s*all")
+        self.assertNotIn("will-change", tasks)
+        self.assertRegex(styles, r"\.task-card\s*\{[^}]*background var\(--motion-base\)")
+        self.assertRegex(styles, r"\.task-card:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--primary\)")
+        self.assertRegex(
+            styles,
+            r"\.sidebar-resize-handle:hover::before[\s\S]*color-mix\(in srgb, var\(--primary\) 34%, transparent\)",
+        )
+        self.assertNotRegex(tasks, r"rgba\(69,\s*123,\s*102")
+        self.assertNotRegex(tasks, r"rgba\(166,\s*70,\s*61")
+        self.assertNotRegex(tasks, r"rgba\(47,\s*111,\s*228")
+        self.assertNotRegex(tasks, r"rgba\(155,\s*127,\s*79")
+        self.assertNotRegex(tasks, r"rgba\(136,\s*157,\s*149")
+
+    def test_main_surface_motion_uses_tokens_and_reduced_motion(self) -> None:
+        source_paths = [
+            Path("codex_image/webui/static/styles/30-layout-top-nav-panels.css"),
+            Path("codex_image/webui/static/styles/40-controls.css"),
+            Path("codex_image/webui/static/styles/50-image-input-gallery.css"),
+            Path("codex_image/webui/static/styles/60-prompt.css"),
+            Path("codex_image/webui/static/styles/70-settings-preview.css"),
+        ]
+        source = "\n".join(path.read_text(encoding="utf-8") for path in source_paths)
+        styles = Path("codex_image/webui/static/styles.css").read_text(encoding="utf-8")
+
+        self.assertNotRegex(source, r"transition:\s*all")
+        self.assertNotRegex(source, r"\b0\.(?:18|2)s\b")
+        self.assertNotRegex(source, r"\b(?:140|160|180|220)ms ease\b")
+        self.assertNotRegex(source, r"rgba\(69,\s*123,\s*102")
+        self.assertNotRegex(source, r"rgba\(166,\s*70,\s*61")
+        self.assertNotRegex(source, r"rgba\(155,\s*127,\s*79")
+        self.assertRegex(styles, r"\.primary-button\s*\{[^}]*transition:\s*background var\(--motion-base\)")
+        self.assertRegex(styles, r"\.ghost-button\s*\{[^}]*background var\(--motion-base\)")
+        self.assertRegex(styles, r"\.segmented-indicator\s*\{[^}]*transform var\(--motion-base\)")
+        self.assertRegex(styles, r"\.segmented-indicator\s*\{[^}]*opacity var\(--motion-fast\)")
+        self.assertRegex(styles, r"\.image-input-main\s*\{[^}]*border-color var\(--motion-base\)")
+        self.assertRegex(styles, r"\.quick-gallery-item\s*\{[^}]*opacity var\(--motion-base\)")
+        self.assertRegex(styles, r"\.resource-sheet\s*\{[^}]*transform var\(--motion-fast\)")
+        self.assertRegex(styles, r"\.settings-grid\s*\{[^}]*transition:\s*height var\(--motion-height\)")
+        self.assertRegex(styles, r"\.custom-size\s*\{[^}]*max-height var\(--motion-height\)")
+        self.assertRegex(styles, r"\.gallery-grid\s*\{[^}]*transition:\s*height var\(--motion-height\)")
+        self.assertRegex(styles, r"\.preview-overlay\s*\{[^}]*transition:\s*opacity var\(--motion-base\)")
+        self.assertRegex(
+            styles,
+            r"@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.primary-button[\s\S]*\.upload-tile[\s\S]*\.quick-gallery-item[\s\S]*\.resource-sheet[\s\S]*transition:\s*none",
+        )
+        self.assertRegex(
+            styles,
+            r"@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*input\[type=range\]\.slider::-webkit-slider-thumb[\s\S]*\.preview-overlay[\s\S]*\.add-upload-to-gallery[\s\S]*transition:\s*none",
         )
 
     def test_closed_right_edge_drawers_do_not_cast_page_edge_shadow(self) -> None:
@@ -73,8 +135,8 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         script = self._frontend_script_source()
         styles = Path("codex_image/webui/static/styles.css").read_text(encoding="utf-8")
 
-        self.assertIn('/static/app.js?v=runtime-251', html)
-        self.assertIn('/static/styles.css?v=runtime-251', html)
+        self.assertIn('/static/app.js?v=runtime-269', html)
+        self.assertIn('/static/styles.css?v=runtime-269', html)
         self.assertIn('id="recentAssetDock"', html)
         self.assertRegex(html, r'class="image-input-footer"[\s\S]*id="recentAssetDock"[\s\S]*id="recentAssetList"')
         self.assertRegex(html, r'id="recentAssetDock"[\s\S]*id="quickGalleryDock"[\s\S]*id="galleryManagePanel"')
@@ -271,6 +333,7 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         main_source = Path("codex_image/webui/frontend/src/main.ts").read_text(encoding="utf-8")
 
         self.assertNotIn("@ts-nocheck", source)
+        self.assertIn('import { prefersReducedMotion } from "./webui-utils";', source)
         self.assertIn('import { initQuickGalleryFeature } from "./quick-gallery"', main_source)
         self.assertLess(main_source.index("initQuickGalleryFeature()"), main_source.index("initGalleryFeature()"))
         self.assertIn("const QUICK_GALLERY_WHEEL_COOLDOWN_MS", source)
@@ -293,6 +356,8 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
             self.assertNotRegex(gallery_source, rf"\n(?:async\s+)?function {function_name}\(")
         self.assertIn("data-quick-gallery-use", source)
         self.assertIn("gallery-fly-clone", source)
+        self.assertIn('behavior: prefersReducedMotion() ? "auto" : behavior', source)
+        self.assertIn("if (prefersReducedMotion()) return;", source)
         self.assertIn("Object.assign(getLegacyBridge().methods", source)
     def test_gallery_grid_feature_has_typescript_source_contract(self) -> None:
         source = self._gallery_grid_source()
@@ -436,6 +501,8 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
     def test_form_controls_feature_has_typescript_source_contract(self) -> None:
         form_controls_source = self._form_controls_source()
         size_source = Path("codex_image/webui/frontend/src/size-presets.ts").read_text(encoding="utf-8")
+        task_submit_source = Path("codex_image/webui/frontend/src/task-submit.ts").read_text(encoding="utf-8")
+        generation_route_source = Path("codex_image/webui/routes/generation.py").read_text(encoding="utf-8")
         main_model_source = Path("codex_image/webui/frontend/src/main-model-combobox.ts").read_text(encoding="utf-8")
         custom_size_source = Path("codex_image/webui/frontend/src/custom-size-controls.ts").read_text(encoding="utf-8")
         output_source = Path("codex_image/webui/frontend/src/output-controls.ts").read_text(encoding="utf-8")
@@ -456,6 +523,16 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         self.assertIn("export function syncSizeControlsFromSize(size", custom_size_source)
         self.assertIn("export function customSizeValidationMessage(width", size_source)
         self.assertIn("export function currentTaskParams()", size_source)
+        self.assertIn("const presetMatch = findPresetForSize(params.size)", size_source)
+        self.assertIn("params.resolution = presetMatch.resolution", size_source)
+        self.assertIn("params.ratio = presetMatch.ratio", size_source)
+        self.assertIn("params.orientation = presetMatch.orientation", size_source)
+        self.assertIn('form.append("resolution", params.resolution)', task_submit_source)
+        self.assertIn('form.append("ratio", params.ratio)', task_submit_source)
+        self.assertIn('form.append("orientation", params.orientation)', task_submit_source)
+        self.assertIn("resolution: str | None = Form(None)", generation_route_source)
+        self.assertIn("ratio: str | None = Form(None)", generation_route_source)
+        self.assertIn("orientation: str | None = Form(None)", generation_route_source)
         self.assertIn("export function restoreMainModel()", main_model_source)
         self.assertIn("export function updateCompression()", output_source)
         self.assertIn("Object.assign(getLegacyBridge().methods", form_controls_source)
@@ -842,6 +919,7 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         self.assertIn("triggerQuickGalleryBounce", script)
         self.assertIn("QUICK_GALLERY_WHEEL_COOLDOWN_MS", script)
         self.assertIn("const QUICK_GALLERY_WHEEL_COOLDOWN_MS = 220;", script)
+        self.assertIn('import { prefersReducedMotion } from "./webui-utils";', script)
         self.assertIn("quickGalleryFocusItemId", script)
         self.assertIn("ensureQuickGalleryFocusItem(items)", script)
         self.assertIn("scrollQuickGalleryItemToFocus", script)
@@ -862,6 +940,8 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         self.assertIn('classList.add("visible")', script)
         self.assertIn('classList.remove("visible")', script)
         self.assertIn("animateGalleryItemToInput", script)
+        self.assertIn('behavior: prefersReducedMotion() ? "auto" : behavior', script)
+        self.assertIn("if (prefersReducedMotion()) return;", script)
         self.assertIn("filterGalleryItems", script)
         self.assertIn("data-quick-gallery-use", script)
         self.assertIn("addGalleryInput(item)", script)
@@ -1357,7 +1437,7 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         self.assertIn(".gallery-category-row.drop-target", styles)
         self.assertIn(".gallery-card.drop-target", styles)
         self.assertRegex(styles, r"\.gallery-category-row\.is-dragging,\s*\.gallery-card\.is-dragging\s*\{[^}]*opacity:\s*0\.42[^}]*\}")
-        self.assertRegex(styles, r"\.gallery-grid\s*\{[^}]*transition:\s*height 220ms ease")
+        self.assertRegex(styles, r"\.gallery-grid\s*\{[^}]*transition:\s*height var\(--motion-height\)")
         self.assertRegex(styles, r"\.gallery-grid\.is-transitioning\s*\{[^}]*will-change:\s*height")
         self.assertRegex(styles, r"\.gallery-grid\s*>\s*\.gallery-grid-layer\s*\{[^}]*grid-area:\s*1\s*/\s*1")
         self.assertRegex(styles, r"\.gallery-grid-layer\s*\{[^}]*display:\s*grid")
@@ -1528,8 +1608,8 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         self.assertRegex(styles, r"\.segmented-indicator\s*\{[^}]*border-radius:\s*var\(--segmented-indicator-radius\)")
         self.assertRegex(styles, r"\.segmented-indicator\s*\{[^}]*background:\s*var\(--primary\)")
         self.assertRegex(styles, r"\.segmented-indicator\s*\{[^}]*transform:\s*translate3d\(var\(--segmented-indicator-x")
-        self.assertRegex(styles, r"\.segmented-indicator\s*\{[^}]*transition:\s*transform 180ms ease")
-        self.assertRegex(styles, r"\.segmented-indicator\s*\{[^}]*width 180ms ease")
+        self.assertRegex(styles, r"\.segmented-indicator\s*\{[^}]*transition:\s*transform var\(--motion-base\)")
+        self.assertRegex(styles, r"\.segmented-indicator\s*\{[^}]*width var\(--motion-base\)")
         self.assertRegex(styles, r"\.radio-group\.segmented-indicator-host\s+\.radio-btn\.active\s*\{[^}]*background:\s*transparent")
         self.assertRegex(styles, r"\.auth-source-group\.segmented-indicator-host\s+\.auth-source-button\.active\s*\{[^}]*background:\s*transparent")
         self.assertRegex(styles, r"@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.segmented-indicator\s*\{[^}]*transition:\s*none")
@@ -1694,7 +1774,7 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         self.assertRegex(styles, r"\.ratio-group\s*\{[^}]*grid-template-rows:\s*repeat\(2,\s*30px\)")
         self.assertRegex(styles, r"\.ratio-group\s+\.radio-btn\s*\{[^}]*transform:\s*scale\(0\.985\)")
         self.assertRegex(styles, r"\.ratio-group\s+\.radio-btn\.active\s*\{[^}]*transform:\s*scale\(1\)")
-        self.assertRegex(styles, r"\.radio-btn\s*\{[^}]*transition:\s*[\s\S]*background-color 180ms ease")
+        self.assertRegex(styles, r"\.radio-btn\s*\{[^}]*transition:\s*[\s\S]*background-color var\(--motion-base\)")
         self.assertRegex(styles, r"@media \(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*\.ratio-group\s+\.radio-btn\s*\{[^}]*transform:\s*none")
         self.assertRegex(styles, r"\.ratio-group\s+\.radio-btn\[data-val=\"1:1\"\]\s*\{[^}]*grid-row:\s*1\s*/\s*3")
         for value, column, row in (
@@ -1847,7 +1927,7 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         self.assertIn("Math.abs(targetHeight - fromHeight) <= CUSTOM_SIZE_HEIGHT_SNAP_TOLERANCE", script)
         self.assertIn("setStatus(customSizeError", script)
         self.assertRegex(styles, r"\.custom-size-control\s*\{[^}]*display:\s*grid")
-        self.assertRegex(styles, r"\.settings-grid\s*\{[^}]*transition:\s*height 220ms ease")
+        self.assertRegex(styles, r"\.settings-grid\s*\{[^}]*transition:\s*height var\(--motion-height\)")
         self.assertRegex(styles, r"\.settings-grid\.is-size-transitioning\s*\{[^}]*overflow:\s*hidden")
         self.assertRegex(styles, r"\.settings-grid\.is-size-transitioning\s*\{[^}]*will-change:\s*height")
         self.assertNotRegex(styles, r"\.custom-size\s*\{[^}]*position:\s*absolute")
@@ -1894,7 +1974,7 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         self.assertRegex(styles, r"\.custom-size\s*\{[^}]*min-height:\s*var\(--custom-size-mode-card-height\)")
         self.assertRegex(styles, r"\.custom-size\s*\{[^}]*max-height:\s*var\(--custom-size-mode-card-height\)")
         self.assertRegex(styles, r"\.custom-size\s*\{[^}]*padding:\s*18px 20px")
-        self.assertRegex(styles, r"\.custom-size\s*\{[^}]*transition:[^}]*max-height 220ms ease")
+        self.assertRegex(styles, r"\.custom-size\s*\{[^}]*transition:[^}]*max-height var\(--motion-height\)")
         self.assertRegex(styles, r"\.custom-size\.custom-size-collapsed\s*\{[^}]*max-height:\s*0")
         self.assertRegex(styles, r"\.custom-size\.custom-size-collapsed\s*\{[^}]*opacity:\s*0")
         self.assertNotIn(".custom-size-field", styles)
@@ -2456,8 +2536,8 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         html = Path("codex_image/webui/static/index.html").read_text(encoding="utf-8")
         script = self._frontend_script_source()
 
-        self.assertIn('/static/app.js?v=runtime-251', html)
-        self.assertIn('/static/styles.css?v=runtime-251', html)
+        self.assertIn('/static/app.js?v=runtime-269', html)
+        self.assertIn('/static/styles.css?v=runtime-269', html)
         self.assertIn('id="pasteClipboardButton"', html)
         self.assertIn('id="statusText"', html)
         self.assertRegex(
@@ -2537,7 +2617,7 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         self.assertRegex(styles, r"\.image-editor-tool-icon\s+svg\s*\{[^}]*width:\s*18px")
         self.assertRegex(styles, r"\.image-editor-actions \.ghost-button,\s*\.image-editor-actions \.primary-button\s*\{[^}]*width:\s*72px")
         self.assertRegex(styles, r"\.image-editor-actions \.ghost-button,\s*\.image-editor-actions \.primary-button\s*\{[^}]*height:\s*44px")
-        self.assertRegex(styles, r"\.thumb-edited-badge\s*\{[^}]*background:\s*rgba\(69,\s*123,\s*102")
+        self.assertRegex(styles, r"\.thumb-edited-badge\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--primary\) 86%, transparent\)")
         self.assertRegex(styles, r"\.thumb-edited-badge\s*\{[^}]*right:\s*5px")
         self.assertRegex(styles, r"\.thumb-edited-badge\s*\{[^}]*bottom:\s*5px")
         self.assertNotRegex(styles, r"\.thumb-edited-badge\s*\{[^}]*left:\s*5px")
@@ -2718,8 +2798,8 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         script = self._frontend_script_source()
         styles = Path("codex_image/webui/static/styles.css").read_text(encoding="utf-8")
 
-        self.assertIn("/static/app.js?v=runtime-251", html)
-        self.assertIn("/static/styles.css?v=runtime-251", html)
+        self.assertIn("/static/app.js?v=runtime-269", html)
+        self.assertIn("/static/styles.css?v=runtime-269", html)
         self.assertIn('const THEME_STORAGE_KEY = "codex-image-theme-preference";', script)
         self.assertIn('themePreference: "system"', script)
         self.assertIn('call(methods, "restoreThemePreference")', script)

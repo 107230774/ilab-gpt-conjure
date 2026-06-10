@@ -1,5 +1,5 @@
 import { getLegacyBridge } from "./state";
-import { cssEscape } from "./webui-utils";
+import { cssEscape, prefersReducedMotion } from "./webui-utils";
 import { formatTranslation, LOCALE_CHANGE_EVENT, translate } from "./i18n";
 
 const bridge = getLegacyBridge();
@@ -7,6 +7,7 @@ const state = bridge.state;
 const els = bridge.els;
 const EXPANDED_TASK_GROUP_INITIAL_CARD_COUNT = 24;
 const EXPANDED_TASK_GROUP_CHUNK_SIZE = 48;
+const EXPANDED_TASK_GROUP_ANIMATION_FALLBACK_MS = 320;
 let expandedTaskGroupRenderToken = 0;
 type QueueTaskIdSections = { running: Map<string, number>; waiting: Map<string, number> };
 let queueTaskIdsCacheKey = "";
@@ -71,6 +72,7 @@ function renderTasks() {
   }
   state.tasksRenderKey = nextRenderKey;
   renderTaskHistoryAnchors(layout);
+  renderHistoryLibraryGroup(tasks, query);
   const activeHtml = activeGroup ? activeTaskGroupHtml(activeGroup) : "";
   renderActiveTaskGroup(activeHtml);
 
@@ -91,6 +93,13 @@ function renderTasks() {
   els.taskList.innerHTML = renderExpandedTaskGroupShellHtml(group);
   scheduleExpandedTaskGroupItemsRender(group, layout.expandedKey || group?.key || null);
   updateDocumentTitle();
+}
+
+function renderHistoryLibraryGroup(tasks: any[], query: string) {
+  if (!els.taskHistoryLibrarySlot) return;
+  const html = historyLibraryGroup(tasks, query);
+  els.taskHistoryLibrarySlot.innerHTML = html;
+  els.taskHistoryLibrarySlot.classList.toggle("hidden", !html);
 }
 
 function renderActiveTaskGroup(activeHtml: string) {
@@ -128,7 +137,7 @@ function taskAnchorLayout(groups: any[], expandedKey: string | null, query: stri
   };
 }
 
-function animateExpandedTaskGroupBody(groupKey: string) {
+function expandedTaskGroupBodyElements(groupKey: string) {
   const escapedGroupKey = cssEscape(groupKey);
   const body = els.taskList?.querySelector(
     `.task-group-items-expanded[data-expanded-task-group-items-key="${escapedGroupKey}"]`,
@@ -136,6 +145,23 @@ function animateExpandedTaskGroupBody(groupKey: string) {
   const headerButton = els.taskList?.querySelector(
     `.task-group[data-task-group="${escapedGroupKey}"] .task-group-header-split`,
   ) as HTMLElement | null;
+  return { body, headerButton };
+}
+
+function finalizeExpandedTaskGroupBody(groupKey: string) {
+  const { body, headerButton } = expandedTaskGroupBodyElements(groupKey);
+  headerButton?.setAttribute("aria-expanded", "true");
+  if (!body) return;
+  body.style.maxHeight = "none";
+  body.style.opacity = "1";
+}
+
+function animateExpandedTaskGroupBody(groupKey: string) {
+  if (prefersReducedMotion()) {
+    finalizeExpandedTaskGroupBody(groupKey);
+    return;
+  }
+  const { body, headerButton } = expandedTaskGroupBodyElements(groupKey);
   if (!body) return;
   headerButton?.setAttribute("aria-expanded", "false");
   body.style.maxHeight = "0px";
@@ -146,12 +172,19 @@ function animateExpandedTaskGroupBody(groupKey: string) {
     body.style.maxHeight = `${body.scrollHeight}px`;
     body.style.opacity = "1";
   });
+  let fallbackTimerId = 0;
+  const finalize = () => {
+    window.clearTimeout(fallbackTimerId);
+    body.removeEventListener("transitionend", handleTransitionEnd);
+    body.style.maxHeight = "none";
+    body.style.opacity = "1";
+  };
   const handleTransitionEnd = (event: TransitionEvent) => {
     if (event.propertyName !== "max-height") return;
-    body.style.maxHeight = "none";
-    body.removeEventListener("transitionend", handleTransitionEnd);
+    finalize();
   };
   body.addEventListener("transitionend", handleTransitionEnd);
+  fallbackTimerId = window.setTimeout(finalize, EXPANDED_TASK_GROUP_ANIMATION_FALLBACK_MS);
 }
 
 function expandedTaskGroupItemsContainer(groupKey: string) {
@@ -166,6 +199,8 @@ function scheduleExpandedTaskGroupItemsRender(group: any, activeGroupKey: string
   const groupKey = String(group?.key || "");
   if (!groupKey) return;
   const normalizedActiveGroupKey = String(activeGroupKey || groupKey);
+  const shouldAnimateExpand = state.expandedTaskGroupAnimationPending === true;
+  state.expandedTaskGroupAnimationPending = false;
   const token = ++expandedTaskGroupRenderToken;
   let index = 0;
   const renderChunk = () => {
@@ -176,13 +211,18 @@ function scheduleExpandedTaskGroupItemsRender(group: any, activeGroupKey: string
     const chunkSize = index === 0 ? EXPANDED_TASK_GROUP_INITIAL_CARD_COUNT : EXPANDED_TASK_GROUP_CHUNK_SIZE;
     const nextTasks = tasks.slice(index, index + chunkSize);
     if (!nextTasks.length) {
+      finalizeExpandedTaskGroupBody(groupKey);
       body.dataset.renderComplete = "true";
       return;
     }
     body.insertAdjacentHTML("beforeend", nextTasks.map((task: any) => taskCardHtml(task)).join(""));
     index += nextTasks.length;
     if (index === nextTasks.length) {
-      animateExpandedTaskGroupBody(groupKey);
+      if (shouldAnimateExpand) {
+        animateExpandedTaskGroupBody(groupKey);
+      } else {
+        finalizeExpandedTaskGroupBody(groupKey);
+      }
     } else if (body.style.maxHeight && body.style.maxHeight !== "none") {
       body.style.maxHeight = `${body.scrollHeight}px`;
     }
@@ -651,7 +691,6 @@ function taskHistoryGroups(tasks: any, query: any) {
   [
     ["yesterday", translate("taskGroup.yesterday")],
     ["last7", translate("taskGroup.last7")],
-    ["older", translate("taskGroup.older")],
   ].forEach(([key, label]: any) => {
     addGroup(
       key,
@@ -662,6 +701,17 @@ function taskHistoryGroups(tasks: any, query: any) {
   });
 
   return groups;
+}
+
+function historyLibraryGroup(tasks: any[], query: string) {
+  if (query) return "";
+  if (!tasks.some((task: any) => !isAlwaysVisibleTask(task))) return "";
+  return `
+    <a class="task-history-library-card" href="/history">
+      <span>${escapeHtml(translate("footer.historyLibrary"))}</span>
+      <small>${escapeHtml(translate("historyLibrary.openFull"))}</small>
+    </a>
+  `;
 }
 
 function isAlwaysVisibleTask(task: any) {

@@ -87,9 +87,22 @@ class WebUIQueueTests(unittest.TestCase):
         from codex_image.webui.app import create_app
 
         with tempfile.TemporaryDirectory() as tmp:
-            app = create_app(output_root=Path(tmp), client_factory=lambda: FakeImageClient(), auth_checker=lambda: True, auto_start_queue=False)
+            root = Path(tmp)
+            app = create_app(output_root=root, client_factory=lambda: FakeImageClient(), auth_checker=lambda: True, auto_start_queue=False)
+            app.state.storage.write_metadata(
+                "20260510101010-aaaaaaaa",
+                {
+                    "task_id": "20260510101010-aaaaaaaa",
+                    "created_at": "2026-05-10T10:10:10+00:00",
+                    "status": "completed",
+                    "prompt": "event snapshot",
+                    "prompt_for_model": "expanded event prompt should stay out of the main snapshot",
+                    "outputs": [{"index": 1, "status": "completed", "thumbnail_url": "/thumb.jpg"}],
+                    "generated_count": 1,
+                    "total_count": 1,
+                },
+            )
             client = TestClient(app)
-            client.post("/api/generate", data={"prompt": "event snapshot", "size": "1024x1024"})
             response = client.get("/api/events")
 
         self.assertEqual(response.status_code, 200)
@@ -97,6 +110,10 @@ class WebUIQueueTests(unittest.TestCase):
         self.assertIn('"type": "snapshot"', response.text)
         self.assertIn('"tasks"', response.text)
         self.assertIn('"queue"', response.text)
+        self.assertIn('"summary_only": true', response.text)
+        self.assertIn('"thumbnail_urls": ["/thumb.jpg"]', response.text)
+        self.assertNotIn("expanded event prompt", response.text)
+        self.assertNotIn('"outputs"', response.text)
     def test_events_endpoint_restarts_stopped_background_worker(self) -> None:
         from codex_image.webui.app import create_app
 

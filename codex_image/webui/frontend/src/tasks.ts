@@ -25,7 +25,7 @@ const markTaskViewed = (...args: any[]) => legacyMethod("markTaskViewed", ...arg
 
 async function refreshTasks({ migrateLegacyArchives = false }: any = {}) {
   const requestSeq = ++state.tasksRequestSeq;
-  const response = await fetch("/api/tasks");
+  const response = await fetch("/api/tasks/recent?limit=200");
   const data = await response.json();
   if (requestSeq !== state.tasksRequestSeq) return;
   await applyTasksSnapshot(data.tasks || [], { migrateLegacyArchives, requestSeq });

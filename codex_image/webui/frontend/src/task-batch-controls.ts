@@ -35,6 +35,7 @@ function toggleBatchMode(force?: any) {
   state.batchMode = typeof force === "boolean" ? force : !state.batchMode;
   if (!state.batchMode) {
     state.batchSelectedTaskIds = [];
+    state.batchSelectionAnchorTaskId = null;
     finishBatchMarqueeSelection();
   }
   renderTasks();
@@ -49,12 +50,64 @@ function toggleBatchTaskSelection(taskId: any) {
   } else {
     state.batchSelectedTaskIds.push(id);
   }
+  state.batchSelectionAnchorTaskId = id;
   renderTasks();
 }
 
 function removeBatchSelectedTaskId(taskId: any) {
   const id = String(taskId || "");
   state.batchSelectedTaskIds = state.batchSelectedTaskIds.filter((item: any) => item !== id);
+}
+
+function visibleBatchTaskIds() {
+  const root = els.taskHistoryShell || els.sidebarContent || els.taskList;
+  if (!root) return [];
+  return Array.from(root.querySelectorAll(TASK_CARD_SELECTOR))
+    .map((card: any) => String(card.dataset.taskId || ""))
+    .filter((taskId) => taskId && !isTaskArchived(taskId));
+}
+
+function applyBatchTaskSelection(taskIds: any[], anchorTaskId: any = null) {
+  state.batchSelectedTaskIds = Array.from(new Set(taskIds.map(String).filter(Boolean)));
+  if (anchorTaskId) state.batchSelectionAnchorTaskId = String(anchorTaskId);
+  state.batchMode = true;
+  renderTasks();
+  renderBatchToolbar();
+}
+
+function selectBatchTaskRange(anchorTaskId: any, taskId: any) {
+  const id = String(taskId || "");
+  if (!id || isTaskArchived(id)) return;
+  const visibleIds = visibleBatchTaskIds();
+  const fallbackAnchor = state.batchSelectedTaskIds.at(-1) || state.selectedTaskId || id;
+  const anchor = String(anchorTaskId || fallbackAnchor || id);
+  const anchorIndex = visibleIds.indexOf(anchor);
+  const targetIndex = visibleIds.indexOf(id);
+  if (anchorIndex < 0 || targetIndex < 0) {
+    applyBatchTaskSelection([...state.batchSelectedTaskIds, id], id);
+    return;
+  }
+  const [start, end] = anchorIndex <= targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex];
+  applyBatchTaskSelection([...state.batchSelectedTaskIds, ...visibleIds.slice(start, end + 1)], anchor);
+}
+
+function handleBatchTaskShortcutSelection(taskId: any, event: MouseEvent | KeyboardEvent) {
+  const id = String(taskId || "");
+  if (!id || isTaskArchived(id)) return false;
+  if (!event.shiftKey && !event.metaKey && !event.ctrlKey) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  state.batchMode = true;
+  if (event.shiftKey) {
+    selectBatchTaskRange(state.batchSelectionAnchorTaskId || state.selectedTaskId || id, id);
+    return true;
+  }
+  const selected = state.batchSelectedTaskIds.includes(id);
+  const nextIds = selected
+    ? state.batchSelectedTaskIds.filter((item: any) => String(item) !== id)
+    : [...state.batchSelectedTaskIds, id];
+  applyBatchTaskSelection(nextIds, id);
+  return true;
 }
 
 function renderBatchToolbar() {
@@ -85,6 +138,7 @@ async function archiveSelectedTasks() {
       state.selectedTaskId = firstVisibleTaskId();
     }
     state.batchSelectedTaskIds = [];
+    state.batchSelectionAnchorTaskId = null;
     state.batchMode = false;
     renderTasks();
     renderArchiveButton();
@@ -128,6 +182,7 @@ async function deleteSelectedTasks(deletableTasks: any, skippedCount = 0) {
       await deleteTaskById(task.task_id);
     }
     state.batchSelectedTaskIds = [];
+    state.batchSelectionAnchorTaskId = null;
     state.batchMode = false;
     renderTasks();
     renderArchiveButton();
@@ -225,6 +280,7 @@ function applyBatchSelectionPreview(taskIds: any) {
   if (previous === next) return;
 
   state.batchSelectedTaskIds = nextIds;
+  state.batchSelectionAnchorTaskId = nextIds.length ? nextIds[nextIds.length - 1] : state.batchSelectionAnchorTaskId || null;
   els.taskList.querySelectorAll(TASK_CARD_SELECTOR).forEach((card: any) => {
     const selected = nextSet.has(String(card.dataset.taskId));
     card.classList.toggle("batch-selected", selected);
@@ -274,6 +330,10 @@ export function initTaskBatchControlsFeature() {
     toggleBatchMode,
     toggleBatchTaskSelection,
     removeBatchSelectedTaskId,
+    visibleBatchTaskIds,
+    applyBatchTaskSelection,
+    selectBatchTaskRange,
+    handleBatchTaskShortcutSelection,
     renderBatchToolbar,
     archiveSelectedTasks,
     openBatchDeleteConfirm,

@@ -648,6 +648,12 @@ button:disabled {
   .sidebar-content, .sidebar-footer {
     display: none;
   }
+  .sidebar-search,
+  .sidebar-filter-panel,
+  .task-history-anchor-rail,
+  .task-history-library-slot {
+    display: none;
+  }
   .dashboard {
     grid-template-columns: 1fr;
     align-content: start;
