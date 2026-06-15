@@ -64,7 +64,7 @@ class WebUIGenerationTests(unittest.TestCase):
 
         fake = FakeImageClient()
         with tempfile.TemporaryDirectory() as tmp:
-            app = create_app(output_root=Path(tmp), client_factory=lambda: fake, auth_checker=lambda: True)
+            app = create_app(output_root=Path(tmp), client_factory=lambda: fake, auth_checker=lambda: True, auto_start_queue=False)
             response = TestClient(app).post(
                 "/api/generate",
                 data={
@@ -100,7 +100,7 @@ class WebUIGenerationTests(unittest.TestCase):
 
         fake = FakeImageClient()
         with tempfile.TemporaryDirectory() as tmp:
-            app = create_app(output_root=Path(tmp), client_factory=lambda: fake, auth_checker=lambda: True)
+            app = create_app(output_root=Path(tmp), client_factory=lambda: fake, auth_checker=lambda: True, auto_start_queue=False)
             response = TestClient(app).post(
                 "/api/generate",
                 data={
