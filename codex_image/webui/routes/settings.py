@@ -22,7 +22,7 @@ def register_settings_routes(app: FastAPI, ctx: WebUIContext) -> None:
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
-        auth_available = bool(ctx.auth_checker())
+        auth_available = bool(ctx.yuanshu.token) or bool(ctx.auth_checker())
         queue_worker = getattr(app, "state", None) and getattr(app.state, "queue_worker_task", None)
         auth = h["auth_event_payload"]()
         return {
@@ -247,6 +247,16 @@ def register_settings_routes(app: FastAPI, ctx: WebUIContext) -> None:
 
     @app.get("/api/auth")
     def get_auth() -> dict[str, Any]:
+        if ctx.yuanshu.token:
+            return {
+                "selected_source": "api",
+                "effective_source": "api",
+                "auth_available": True,
+                "sources": {
+                    "api": {"available": True},
+                    "codex": {"available": False},
+                },
+            }
         return h["auth_status"](ctx.auth_settings.read_source())
 
     @app.patch("/api/auth")

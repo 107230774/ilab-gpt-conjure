@@ -165,7 +165,7 @@ function writeProviderForm(provider: any): void {
     els.apiKey.value = provider.api_key || "";
     els.apiKey.placeholder = provider.api_key_set && !provider.api_key
       ? translate("apiSettings.savedKeyPlaceholder")
-      : "sk-...";
+      : "由元枢自动配置";
   }
 }
 

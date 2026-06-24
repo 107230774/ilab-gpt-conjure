@@ -1,5 +1,6 @@
 import { getLegacyBridge } from "./state";
 import { formatTranslation, translate } from "./i18n";
+import { yuanshuPath } from "./yuanshu-paths";
 
 const RATIO_ORIENTATION: Record<string, string> = {
   "1:1": "square",
@@ -134,24 +135,24 @@ function greatestCommonDivisor(left: number, right: number): number {
 
 function taskInputUrls(task: any) {
   if (Array.isArray(task.input_urls) && task.input_urls.length) {
-    return task.input_urls;
+    return task.input_urls.map((url: any) => yuanshuPath(String(url || ""))).filter(Boolean);
   }
   if (!Array.isArray(task.input_files) || !task.task_id) {
     return [];
   }
-  return task.input_files.map((filename: any) => `/inputs/${encodeURIComponent(filename)}`);
+  return task.input_files.map((filename: any) => yuanshuPath(`/inputs/${encodeURIComponent(filename)}`));
 }
 
 function taskInputThumbnailRoute(task: any, index: any) {
   const inputIndex = positiveInt(index);
   if (!task?.task_id || inputIndex === null) return "";
-  return `/api/tasks/${encodeURIComponent(task.task_id)}/inputs/${inputIndex}/thumbnail`;
+  return yuanshuPath(`/api/tasks/${encodeURIComponent(task.task_id)}/inputs/${inputIndex}/thumbnail`);
 }
 
 function taskInputThumbnailUrls(task: any) {
   if (!task) return [];
   if (Array.isArray(task.input_thumbnail_urls) && task.input_thumbnail_urls.length) {
-    return task.input_thumbnail_urls.filter(Boolean);
+    return task.input_thumbnail_urls.map((url: any) => yuanshuPath(String(url || ""))).filter(Boolean);
   }
   return taskInputUrls(task).map((_: any, index: number) => taskInputThumbnailRoute(task, index + 1)).filter(Boolean);
 }
@@ -166,13 +167,13 @@ function taskInputPreviewUrls(task: any) {
     const inputUrls = taskInputUrls(task);
     let uploadInputIndex = 0;
     return task.input_sources.map((source: any) => {
-      if (source?.kind !== "upload") return source?.image_url;
+      if (source?.kind !== "upload") return yuanshuPath(source?.image_url || "");
       const fallbackUrl = inputUrls[uploadInputIndex];
       const thumbnailUrl = source.thumbnail_url || thumbnailUrls[uploadInputIndex];
       uploadInputIndex += 1;
-      if (thumbnailUrl) return thumbnailUrl;
+      if (thumbnailUrl) return yuanshuPath(thumbnailUrl);
       if (fallbackUrl && isLegacyOutputInputUrl(source.image_url)) return fallbackUrl;
-      return source.image_url || fallbackUrl;
+      return yuanshuPath(source.image_url || fallbackUrl);
     }).filter(Boolean);
   }
   return thumbnailUrls.length ? thumbnailUrls : taskInputUrls(task);
@@ -180,13 +181,13 @@ function taskInputPreviewUrls(task: any) {
 
 function outputFileUrl(filename: any) {
   const clean = String(filename || "").split("/").filter(Boolean).map(encodeURIComponent).join("/");
-  return clean ? `/outputs/${clean}` : "";
+  return clean ? yuanshuPath(`/outputs/${clean}`) : "";
 }
 
 function taskThumbnailRoute(task: any, index: any) {
   const outputIndex = positiveInt(index);
   if (!task?.task_id || outputIndex === null) return "";
-  return `/api/tasks/${encodeURIComponent(task.task_id)}/outputs/${outputIndex}/thumbnail`;
+  return yuanshuPath(`/api/tasks/${encodeURIComponent(task.task_id)}/outputs/${outputIndex}/thumbnail`);
 }
 
 function taskThumbnailUrls(task: any) {
@@ -197,7 +198,7 @@ function taskThumbnailUrls(task: any) {
     const clean = String(url || "").trim();
     const outputIndex = positiveInt(index);
     if (!clean || (outputIndex !== null && deletedIndexes.has(outputIndex)) || urls.includes(clean)) return;
-    urls.push(clean);
+    urls.push(yuanshuPath(clean));
   };
 
   if (Array.isArray(task.thumbnail_urls) && task.thumbnail_urls.length) {
@@ -235,10 +236,10 @@ function taskOutputUrls(task: any) {
         : null;
       const index = positiveInt(record?.index) || taskOutputIndexFromUrl(url) || fallbackIndex + 1;
       return !deletedIndexes.has(index) && !taskOutputRecordIsDeleted(record);
-    });
+    }).map((url: any) => yuanshuPath(String(url || "")));
   }
   const singleIndex = taskOutputIndexFromUrl(task.output_url) || 1;
-  if (task.output_url && !deletedIndexes.has(singleIndex)) return [task.output_url];
+  if (task.output_url && !deletedIndexes.has(singleIndex)) return [yuanshuPath(task.output_url)];
   return [];
 }
 

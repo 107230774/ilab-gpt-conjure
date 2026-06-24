@@ -1,4 +1,5 @@
 import "../legacy-app.js";
+import { installYuanshuPathRuntime } from "./yuanshu-paths";
 import { initInputSourcesFeature } from "./input-sources";
 import { initImageEditorFeature } from "./image-editor";
 import { initImageStripFeature } from "./image-strip";
@@ -39,7 +40,9 @@ import { initLightboxFeature } from "./lightbox";
 import { initializeQueueFeature } from "./queue";
 import { initSegmentedIndicatorFeature } from "./segmented-indicator";
 import { initI18nFeature } from "./i18n";
+import { initYuanshuModeFeature } from "./yuanshu";
 
+installYuanshuPathRuntime();
 initInputSourcesFeature();
 initImageEditorFeature();
 initImageStripFeature();
@@ -81,3 +84,4 @@ initLightboxFeature();
 initializeQueueFeature();
 initSegmentedIndicatorFeature();
 window.__codexImageWebUI?.boot();
+initYuanshuModeFeature();

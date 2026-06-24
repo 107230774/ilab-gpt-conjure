@@ -1,6 +1,7 @@
 import { getLegacyBridge } from "./state";
 import { formatTranslation, LOCALE_CHANGE_EVENT, translate } from "./i18n";
 import type { TaskNotification, TaskNotificationSettings, TaskStatus, WebUITask } from "./types";
+import { yuanshuPath } from "./yuanshu-paths";
 
 const TASK_NOTIFICATION_SETTINGS_KEY = "codex-image-task-notification-settings";
 const TASK_NOTIFICATION_SEEN_KEY = "codex-image-task-notification-seen";
@@ -353,16 +354,16 @@ function firstTaskThumbnailUrl(task: WebUITask): string | undefined {
   const bridge = getLegacyBridge();
   const urls = bridge.methods.taskThumbnailUrls?.(task);
   if (Array.isArray(urls) && urls[0]) return String(urls[0]);
-  if (Array.isArray(task.thumbnail_urls) && task.thumbnail_urls[0]) return String(task.thumbnail_urls[0]);
+  if (Array.isArray(task.thumbnail_urls) && task.thumbnail_urls[0]) return yuanshuPath(String(task.thumbnail_urls[0]));
   const output = Array.isArray(task.outputs) ? task.outputs.find((record) => record?.status === "completed") : null;
-  if (output?.thumbnail_url) return String(output.thumbnail_url);
+  if (output?.thumbnail_url) return yuanshuPath(String(output.thumbnail_url));
   if (output?.thumbnail_file) return outputFileUrl(output.thumbnail_file);
   if (output?.url || output?.file) {
     const index = positiveNumber(output.index) || 1;
-    return `/api/tasks/${encodeURIComponent(task.task_id)}/outputs/${index}/thumbnail`;
+    return yuanshuPath(`/api/tasks/${encodeURIComponent(task.task_id)}/outputs/${index}/thumbnail`);
   }
   if (Array.isArray(task.output_urls) && task.output_urls.some(Boolean)) {
-    return `/api/tasks/${encodeURIComponent(task.task_id)}/outputs/1/thumbnail`;
+    return yuanshuPath(`/api/tasks/${encodeURIComponent(task.task_id)}/outputs/1/thumbnail`);
   }
   return undefined;
 }
@@ -376,7 +377,7 @@ function taskNotificationItemHtml(notification: TaskNotification): string {
 
 function taskNotificationInnerHtml(notification: TaskNotification): string {
   const thumbnail = notification.thumbnail_url
-    ? `<img class="task-notification-thumb" src="${escapeHtml(notification.thumbnail_url)}" alt="">`
+    ? `<img class="task-notification-thumb" src="${escapeHtml(yuanshuPath(notification.thumbnail_url))}" alt="">`
     : `<span class="task-notification-thumb task-notification-thumb-placeholder" aria-hidden="true">${escapeHtml(statusGlyph(notification.status))}</span>`;
   return `${thumbnail}
     <span class="task-notification-body">

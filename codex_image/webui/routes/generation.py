@@ -51,7 +51,7 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
         reference_asset_ids: list[str] | None = Form(None),
         reference_images: list[UploadFile] | None = File(None),
     ) -> dict[str, Any]:
-        if not ctx.auth_checker():
+        if not ctx.yuanshu.token and not ctx.auth_checker():
             raise HTTPException(status_code=401, detail="Codex auth is not available")
 
         gallery_refs, gallery_data_urls = _resolve_gallery_refs(ctx.gallery_storage, gallery_image_ids or [])
@@ -77,6 +77,14 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
         effective_codex_mode = h["request_codex_mode"](auth_source, codex_mode)
         effective_api_images_concurrency = h["request_api_images_concurrency"](auth_source, effective_api_provider_id)
         requested_backend = h["backend_for_submit"](auth_source, effective_api_mode, effective_codex_mode)
+        if ctx.yuanshu.token:
+            auth_source = "api"
+            effective_api_provider_id = "yuanshu"
+            effective_api_provider_name = "元枢"
+            effective_api_mode = "images"
+            effective_codex_mode = None
+            effective_api_images_concurrency = 1
+            requested_backend = "openai_images"
         transport_mode = effective_api_mode or effective_codex_mode
         web_search_enabled = bool(web_search) and requested_backend.endswith("_responses")
         request_model_prompt = _prompt_for_transport(

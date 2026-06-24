@@ -237,7 +237,7 @@ def create_app(
     make_client = client_factory or (lambda: _client_for_auth_source(auth_settings.read_source(), api_settings=api_settings))
     check_auth = auth_checker or (lambda: bool(_auth_status(auth_settings.read_source(), api_settings=api_settings)["auth_available"]))
 
-    app = FastAPI(title="iLab GPT CONJURE", lifespan=queue_lifespan)
+    app = FastAPI(title="元枢在线生图", lifespan=queue_lifespan)
     ctx = WebUIContext(
         app=app,
         storage=storage,
@@ -270,6 +270,9 @@ def create_app(
     app.mount("/inputs", StaticFiles(directory=input_path, check_dir=False), name="inputs")
     app.mount("/outputs", StaticFiles(directory=output_path, check_dir=False), name="outputs")
     app.mount("/static", NoCacheStaticFiles(directory=static_path, check_dir=False), name="static")
+    app.mount("/image-playground/inputs", StaticFiles(directory=input_path, check_dir=False), name="yuanshu-inputs")
+    app.mount("/image-playground/outputs", StaticFiles(directory=output_path, check_dir=False), name="yuanshu-outputs")
+    app.mount("/image-playground/static", NoCacheStaticFiles(directory=static_path, check_dir=False), name="yuanshu-static")
 
     @app.get("/", response_model=None)
     def index() -> Response:
@@ -277,9 +280,13 @@ def create_app(
         if index_path.exists():
             return FileResponse(index_path, headers={"Cache-Control": "no-store"})
         return HTMLResponse(
-            "<!doctype html><title>iLab GPT CONJURE</title><h1>iLab GPT CONJURE</h1>",
+            "<!doctype html><title>元枢在线生图</title><h1>元枢在线生图</h1>",
             headers={"Cache-Control": "no-store"},
         )
+
+    @app.get("/image-playground/", response_model=None)
+    def yuanshu_index() -> Response:
+        return index()
 
     @app.get("/history", response_model=None)
     def history() -> Response:
@@ -287,9 +294,13 @@ def create_app(
         if history_path.exists():
             return FileResponse(history_path, headers={"Cache-Control": "no-store"})
         return HTMLResponse(
-            "<!doctype html><title>History - iLab GPT CONJURE</title><h1>History</h1>",
+            "<!doctype html><title>历史库 - 元枢在线生图</title><h1>History</h1>",
             headers={"Cache-Control": "no-store"},
         )
+
+    @app.get("/image-playground/history", response_model=None)
+    def yuanshu_history() -> Response:
+        return history()
 
     ctx.route_helpers.update(
         {

@@ -1,5 +1,6 @@
 import { getLegacyBridge } from "./state";
 import { formatTranslation, LOCALE_CHANGE_EVENT, translate } from "./i18n";
+import { yuanshuPath } from "./yuanshu-paths";
 
 const bridge = getLegacyBridge();
 const state = bridge.state;
@@ -52,7 +53,7 @@ function renderRecentAssets() {
     return `
     <div class="recent-asset-button" title="${escapeHtml(name)}">
       <button class="recent-asset-use" type="button" data-reference-asset-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(formatTranslation("recentAssets.use", { name }))}">
-        <img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(name)}">
+        <img src="${escapeHtml(yuanshuPath(item.image_url))}" alt="${escapeHtml(name)}">
         <span>${escapeHtml(name)}</span>
       </button>
       <button class="recent-asset-delete" type="button" data-reference-asset-delete="${escapeHtml(item.id)}" aria-label="${escapeHtml(formatTranslation("recentAssets.delete", { name }))}">×</button>

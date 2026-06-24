@@ -1,5 +1,6 @@
 import { getLegacyBridge } from "./state";
 import { formatTranslation, LOCALE_CHANGE_EVENT, translate } from "./i18n";
+import { yuanshuPath } from "./yuanshu-paths";
 
 const PROMPT_TEMPLATES_ENDPOINT = "/api/prompt-templates";
 const PROMPT_TEMPLATE_CATEGORIES_ENDPOINT = "/api/prompt-template-categories";
@@ -302,7 +303,7 @@ function renderPromptTemplateList() {
   }
   els.promptTemplateList.innerHTML = templates.map((template: any) => `
     <button class="prompt-template-card" type="button" data-prompt-template-id="${escapeHtml(template.id)}">
-      ${template.thumbnail_url ? `<span class="prompt-template-card-thumb"><img src="${escapeHtml(template.thumbnail_url)}" alt=""></span>` : ""}
+      ${template.thumbnail_url ? `<span class="prompt-template-card-thumb"><img src="${escapeHtml(yuanshuPath(template.thumbnail_url))}" alt=""></span>` : ""}
       <span class="prompt-template-card-title">${escapeHtml(template.short_title)}</span>
       <span class="prompt-template-card-subtitle">${escapeHtml(template.title)}</span>
       <span class="prompt-template-card-preview">${escapeHtml(promptTemplatePreview(template.content, 64))}</span>
@@ -342,7 +343,7 @@ function selectPromptTemplate(templateId: any) {
       <button class="ghost-button text-sm" type="button" data-prompt-template-back>${translate("templates.back")}</button>
       <button class="ghost-button text-sm" type="button" data-prompt-template-edit="${escapeHtml(template.id)}">${translate("templates.edit")}</button>
     </div>
-    ${template.thumbnail_url ? `<img class="prompt-template-detail-thumb" src="${escapeHtml(template.thumbnail_url)}" alt="">` : ""}
+    ${template.thumbnail_url ? `<img class="prompt-template-detail-thumb" src="${escapeHtml(yuanshuPath(template.thumbnail_url))}" alt="">` : ""}
     <h3>${escapeHtml(template.title)}</h3>
     <div class="prompt-template-detail-meta">
       <span>${escapeHtml(promptTemplateCategoryLabel(template.category))}</span>
@@ -510,7 +511,7 @@ function renderPromptTemplateThumbnailPicker(selectedUrl = "") {
   if (input) input.value = selectedUrl;
   if (preview) {
     preview.innerHTML = selectedUrl
-      ? `<img src="${escapeHtml(selectedUrl)}" alt=""><span>${escapeHtml(promptTemplatePreview(selectedUrl, 30))}</span>`
+      ? `<img src="${escapeHtml(yuanshuPath(selectedUrl))}" alt=""><span>${escapeHtml(promptTemplatePreview(selectedUrl, 30))}</span>`
       : `<span>${escapeHtml(translate("templates.thumbnailNone"))}</span>`;
   }
   if (!picker) return;
@@ -521,7 +522,7 @@ function renderPromptTemplateThumbnailPicker(selectedUrl = "") {
   }
   picker.innerHTML = thumbnails.map((item) => `
     <button class="prompt-template-thumbnail-option ${item.url === selectedUrl ? "active" : ""}" type="button" data-prompt-template-thumbnail-select="${escapeHtml(item.url)}" title="${escapeHtml(item.label)}">
-      <img src="${escapeHtml(item.url)}" alt="">
+      <img src="${escapeHtml(yuanshuPath(item.url))}" alt="">
     </button>
   `).join("");
 }

@@ -1,5 +1,6 @@
 import { formatTranslation, translate } from "./i18n";
 import { escapeHtml } from "./webui-utils";
+import { yuanshuPath } from "./yuanshu-paths";
 
 export type HistoryOutputRecord = {
   url: string;
@@ -60,7 +61,7 @@ export function taskOutputRecords(task: any): HistoryOutputRecord[] {
   const outputs = Array.isArray(task?.outputs) ? task.outputs : [];
   outputs.forEach((output: any, fallbackIndex: number) => {
     if (!output || output.deleted || output.status === "deleted") return;
-    const url = String(output.url || output.output_url || "");
+    const url = yuanshuPath(String(output.url || output.output_url || ""));
     if (!url || output.status === "failed") return;
     const outputIndex = positiveInt(output.index) || fallbackIndex + 1;
     const size = outputSizeForTask(task, fallbackIndex, output);
@@ -81,7 +82,7 @@ export function taskOutputRecords(task: any): HistoryOutputRecord[] {
       const outputIndex = index + 1;
       const size = outputSizeForTask(task, index);
       return {
-        url: String(url),
+        url: yuanshuPath(String(url)),
         index: outputIndex,
         selected: selectedIndexes.has(outputIndex),
         revisedPrompt: String(task?.revised_prompts?.[index] || task?.revised_prompt || ""),
@@ -115,8 +116,8 @@ export function taskInputRecords(task: any): HistoryInputRecord[] {
   const records: HistoryInputRecord[] = [];
   const seen = new Set<string>();
   const addRecord = (url: unknown, thumbnailUrl: unknown, label: unknown): void => {
-    const fullUrl = String(url || thumbnailUrl || "");
-    const thumb = String(thumbnailUrl || url || "");
+    const fullUrl = yuanshuPath(String(url || thumbnailUrl || ""));
+    const thumb = yuanshuPath(String(thumbnailUrl || url || ""));
     if (!fullUrl || seen.has(fullUrl)) return;
     seen.add(fullUrl);
     records.push({

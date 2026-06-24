@@ -12,7 +12,7 @@ from typing import Any
 from codex_image.version import APP_VERSION, APP_VERSION_TAG
 
 UPDATE_NOTICE_FILENAME = "update-notice.json"
-RELEASES_URL = "https://github.com/kadevin/ilab-gpt-conjure/releases"
+RELEASES_URL = "/image-playground/"
 
 
 def _parse_semver(value: str | None) -> tuple[int, int, int] | None:

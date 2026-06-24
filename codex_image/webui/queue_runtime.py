@@ -28,6 +28,7 @@ from .executor import (
 )
 from .queue import NonRetryableTaskError, QueueChannel, QueueManager
 from .storage import utc_now
+from .yuanshu import yuanshu_client
 
 
 @dataclass(frozen=True)
@@ -105,6 +106,8 @@ def _queue_channel_available(ctx: WebUIContext, channel: QueueChannel) -> bool:
 
 
 def _client_for_queue_channel(ctx: WebUIContext, channel: QueueChannel, metadata: dict[str, Any] | None = None, *, client_factory_overridden: bool = False) -> Any:
+    if ctx.yuanshu.token:
+        return yuanshu_client(ctx.yuanshu)
     if client_factory_overridden:
         return ctx.client_factory()
     if channel.auth_source == "api":

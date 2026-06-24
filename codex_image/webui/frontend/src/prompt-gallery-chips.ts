@@ -1,6 +1,7 @@
 import { getLegacyBridge } from "./state";
 import { positionPromptPopoverAtAnchor } from "./prompt-popover-position";
 import { formatTranslation, translate } from "./i18n";
+import { yuanshuPath } from "./yuanshu-paths";
 
 const bridge = getLegacyBridge();
 const state = bridge.state;
@@ -69,7 +70,7 @@ export function updateMentionSuggest(): void {
   }
   els.mentionSuggest.innerHTML = items.map((item: any) => `
     <button type="button" class="mention-option" data-mention-id="${escapeHtml(item.id)}">
-      <img src="${escapeHtml(item.image_url)}" alt="">
+      <img src="${escapeHtml(yuanshuPath(item.image_url))}" alt="">
       <span>@${escapeHtml(item.name)}</span>
       <small>${escapeHtml(categoryLabel(item.category))}</small>
     </button>

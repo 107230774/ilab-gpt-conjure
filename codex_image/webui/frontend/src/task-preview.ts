@@ -1,5 +1,6 @@
 import { getLegacyBridge } from "./state";
 import { formatTranslation, LOCALE_CHANGE_EVENT, translate } from "./i18n";
+import { yuanshuPath } from "./yuanshu-paths";
 
 const bridge = getLegacyBridge();
 const state = bridge.state;
@@ -331,7 +332,7 @@ function ensurePreviewOutputCard(key: string) {
 
 function updatePreviewOutputCard(card: HTMLElement, task: any, url: any, index: any, totalCount: any, { preservePreviousImage = true, imageAlreadyLoaded = false }: any = {}) {
   const outputIndex = taskOutputIndex(task, url, index);
-  const outputUrl = String(url || "");
+  const outputUrl = yuanshuPath(String(url || ""));
   const downloadName = outputDownloadFilename(task, url, index);
   card.setAttribute("data-preview-card-key", previewOutputCardKey(task, url, index));
   card.setAttribute("data-preview-output-url", outputUrl);
@@ -629,7 +630,7 @@ function taskSelectedOutputDownloadName(task: any) {
 
 function taskOutputZipUrl(task: any, { selected = false }: any = {}) {
   const url = `/api/tasks/${encodeURIComponent(String(task?.task_id || ""))}/outputs.zip`;
-  return selected ? `${url}?selected=1` : url;
+  return yuanshuPath(selected ? `${url}?selected=1` : url);
 }
 
 async function updateTaskOutputSelection(taskId: any, outputIndex: any, selected: boolean) {

@@ -1,4 +1,5 @@
 import { getLegacyBridge } from "./state";
+import { yuanshuPath } from "./yuanshu-paths";
 import { cssEscape, prefersReducedMotion } from "./webui-utils";
 import { formatTranslation, LOCALE_CHANGE_EVENT, translate } from "./i18n";
 
@@ -802,7 +803,7 @@ function historyLibraryGroup(tasks: any[], query: string) {
   if (query) return "";
   if (!tasks.some((task: any) => !isAlwaysVisibleTask(task))) return "";
   return `
-    <a class="task-history-library-card" href="/history">
+    <a class="task-history-library-card" href="${yuanshuPath("/history")}">
       <span>${escapeHtml(translate("footer.historyLibrary"))}</span>
       <small>${escapeHtml(translate("historyLibrary.openFull"))}</small>
     </a>

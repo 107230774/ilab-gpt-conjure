@@ -545,7 +545,7 @@
     "footer.archiveCount": "Archive {count}",
     "footer.historyLibrary": "History",
     "historyLibrary.openFull": "Open full history library",
-    "history.documentTitle": "History - iLab GPT CONJURE",
+    "history.documentTitle": "History - Yuanshu Image",
     "history.back": "Back to generator",
     "history.title": "History",
     "history.loading": "Loading",
@@ -1433,7 +1433,7 @@
     "footer.archiveCount": "Archiv {count}",
     "footer.historyLibrary": "Geschichte",
     "historyLibrary.openFull": "\xD6ffnen Sie die vollst\xE4ndige Geschichtsbibliothek",
-    "history.documentTitle": "Geschichte \u2013 iLab GPT CONJURE",
+    "history.documentTitle": "Geschichte \u2013 Yuanshu Image",
     "history.back": "Zur\xFCck zum Generator",
     "history.title": "Geschichte",
     "history.loading": "Laden",
@@ -2321,7 +2321,7 @@
     "footer.archiveCount": "Archivo {count}",
     "footer.historyLibrary": "Historia",
     "historyLibrary.openFull": "Abrir biblioteca de historia completa",
-    "history.documentTitle": "Historia - iLab GPT CONJURE",
+    "history.documentTitle": "Historia - Yuanshu Image",
     "history.back": "Volver al generador",
     "history.title": "Historia",
     "history.loading": "Cargando",
@@ -3209,7 +3209,7 @@
     "footer.archiveCount": "Archiver {count}",
     "footer.historyLibrary": "Histoire",
     "historyLibrary.openFull": "Ouvrir la biblioth\xE8que d'historique compl\xE8te",
-    "history.documentTitle": "Histoire - iLab GPT CONJURE",
+    "history.documentTitle": "Histoire - Yuanshu Image",
     "history.back": "Retour au g\xE9n\xE9rateur",
     "history.title": "Histoire",
     "history.loading": "Chargement",
@@ -4097,7 +4097,7 @@
     "footer.archiveCount": "\u30A2\u30FC\u30AB\u30A4\u30D6 {count}",
     "footer.historyLibrary": "\u5C65\u6B74",
     "historyLibrary.openFull": "\u5C65\u6B74\u30E9\u30A4\u30D6\u30E9\u30EA\u5168\u4F53\u3092\u958B\u304F",
-    "history.documentTitle": "\u5C65\u6B74 - iLab GPT CONJURE",
+    "history.documentTitle": "\u5C65\u6B74 - Yuanshu Image",
     "history.back": "\u30B8\u30A7\u30CD\u30EC\u30FC\u30BF\u30FC\u306B\u623B\u308B",
     "history.title": "\u5C65\u6B74",
     "history.loading": "\u8AAD\u307F\u8FBC\u307F\u4E2D",
@@ -4985,7 +4985,7 @@
     "footer.archiveCount": "\uBCF4\uAD00\uD568 {count}",
     "footer.historyLibrary": "\uAE30\uB85D",
     "historyLibrary.openFull": "\uC804\uCCB4 \uAE30\uB85D \uB77C\uC774\uBE0C\uB7EC\uB9AC \uC5F4\uAE30",
-    "history.documentTitle": "\uAE30\uB85D - iLab GPT CONJURE",
+    "history.documentTitle": "\uAE30\uB85D - Yuanshu Image",
     "history.back": "\uC0DD\uC131\uAE30\uB85C \uB3CC\uC544\uAC00\uAE30",
     "history.title": "\uAE30\uB85D",
     "history.loading": "\uB85C\uB4DC \uC911",
@@ -5873,7 +5873,7 @@
     "footer.archiveCount": "Arquivo {count}",
     "footer.historyLibrary": "Hist\xF3ria",
     "historyLibrary.openFull": "Abra a biblioteca de hist\xF3rico completa",
-    "history.documentTitle": "Hist\xF3ria - iLab GPT CONJURE",
+    "history.documentTitle": "Hist\xF3ria - Yuanshu Image",
     "history.back": "Voltar ao gerador",
     "history.title": "Hist\xF3ria",
     "history.loading": "Carregando",
@@ -6761,7 +6761,7 @@
     "footer.archiveCount": "\u0410\u0440\u0445\u0438\u0432 {count}",
     "footer.historyLibrary": "\u0418\u0441\u0442\u043E\u0440\u0438\u044F",
     "historyLibrary.openFull": "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u043E\u043B\u043D\u0443\u044E \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0443 \u0438\u0441\u0442\u043E\u0440\u0438\u0438",
-    "history.documentTitle": "\u0418\u0441\u0442\u043E\u0440\u0438\u044F - iLab GPT CONJURE",
+    "history.documentTitle": "\u0418\u0441\u0442\u043E\u0440\u0438\u044F - Yuanshu Image",
     "history.back": "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u043A \u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u0443",
     "history.title": "\u0418\u0441\u0442\u043E\u0440\u0438\u044F",
     "history.loading": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430",
@@ -7649,7 +7649,7 @@
     "footer.archiveCount": "Archivio {count}",
     "footer.historyLibrary": "Storia",
     "historyLibrary.openFull": "Apri la libreria della cronologia completa",
-    "history.documentTitle": "Storia - iLab GPT CONJURE",
+    "history.documentTitle": "Storia - Yuanshu Image",
     "history.back": "Torniamo al generatore",
     "history.title": "Storia",
     "history.loading": "Caricamento in corso",
@@ -9425,7 +9425,7 @@
     "footer.archiveCount": "\u4F1A\u8BDD\u5F52\u6863 {count}",
     "footer.historyLibrary": "\u5386\u53F2\u5E93",
     "historyLibrary.openFull": "\u6253\u5F00\u5B8C\u6574\u5386\u53F2\u5E93",
-    "history.documentTitle": "\u5386\u53F2\u5E93 - iLab GPT CONJURE",
+    "history.documentTitle": "\u5386\u53F2\u5E93 - Yuanshu Image",
     "history.back": "\u8FD4\u56DE\u751F\u6210\u9875",
     "history.title": "\u5386\u53F2\u5E93",
     "history.loading": "\u8F7D\u5165\u4E2D",
@@ -10313,7 +10313,7 @@
     "footer.archiveCount": "\u6703\u8A71\u6B78\u6A94{count}",
     "footer.historyLibrary": "\u6B77\u53F2\u5EAB",
     "historyLibrary.openFull": "\u958B\u555F\u5B8C\u6574\u6B77\u53F2\u5EAB",
-    "history.documentTitle": "\u6B77\u53F2\u5EAB - iLabGPTCONJURE",
+    "history.documentTitle": "\u6B77\u53F2\u5EAB - Yuanshu Image",
     "history.back": "\u8FD4\u56DE\u751F\u6210\u9801",
     "history.title": "\u6B77\u53F2\u5EAB",
     "history.loading": "\u8F09\u5165\u4E2D",
@@ -11201,7 +11201,7 @@
     "footer.archiveCount": "\u6703\u8A71\u6B78\u6A94{count}",
     "footer.historyLibrary": "\u6B77\u53F2\u5EAB",
     "historyLibrary.openFull": "\u958B\u555F\u5B8C\u6574\u6B77\u53F2\u5EAB",
-    "history.documentTitle": "\u6B77\u53F2\u5EAB - iLabGPTCONJURE",
+    "history.documentTitle": "\u6B77\u53F2\u5EAB - Yuanshu Image",
     "history.back": "\u8FD4\u56DE\u751F\u6210\u9801",
     "history.title": "\u6B77\u53F2\u5EAB",
     "history.loading": "\u8F09\u5165\u4E2D",
@@ -12375,13 +12375,13 @@
     { id: "character", name: "\u89D2\u8272", prompt_role: "\u89D2\u8272\u53C2\u8003", order: 20 },
     { id: "product", name: "\u4EA7\u54C1", prompt_role: "\u4EA7\u54C1\u53C2\u8003", order: 30 }
   ];
-  var DEFAULT_API_BASE_URL = "https://api.openai.com/v1";
+  var DEFAULT_API_BASE_URL = "/image-playground/api/v1";
   var DEFAULT_API_IMAGE_MODEL = "gpt-image-2";
   var DEFAULT_API_MODE = "images";
   var DEFAULT_CODEX_MODE = "images";
   var DEFAULT_API_IMAGES_CONCURRENCY = 4;
   var API_SETTINGS_STORAGE_KEY = "codex-image-api-settings";
-  var DEFAULT_DOCUMENT_TITLE = document.title || "iLab GPT CONJURE";
+  var DEFAULT_DOCUMENT_TITLE = document.title || "\u5143\u67A2\u5728\u7EBF\u751F\u56FE";
   var TASK_HISTORY_EXPANDED_GROUP_STORAGE_KEY = "codex-image-task-history-expanded-group";
   function defaultGalleryCategories() {
     return DEFAULT_GALLERY_CATEGORIES.map((category) => ({ ...category }));
@@ -12693,6 +12693,43 @@
 
   // codex_image/webui/frontend/legacy-app.js
   initializeLegacyBridge();
+
+  // codex_image/webui/frontend/src/yuanshu-paths.ts
+  var YUANSHU_BASE_PATH = "/image-playground";
+  function isExternalUrl(value) {
+    return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(value);
+  }
+  function yuanshuPath(path) {
+    const value = String(path || "");
+    if (!value || isExternalUrl(value)) return value;
+    if (value === YUANSHU_BASE_PATH || value.startsWith(`${YUANSHU_BASE_PATH}/`)) return value;
+    if (value.startsWith("/")) return `${YUANSHU_BASE_PATH}${value}`;
+    return value;
+  }
+  function normalizeRequestInfo(input) {
+    if (typeof input === "string") return yuanshuPath(input);
+    if (input instanceof URL && input.origin === window.location.origin) {
+      const normalized = yuanshuPath(`${input.pathname}${input.search}${input.hash}`);
+      return new URL(normalized, window.location.origin);
+    }
+    return input;
+  }
+  function installYuanshuPathRuntime() {
+    const win = window;
+    if (win.__yuanshuPathRuntimeInstalled) return;
+    win.__yuanshuPathRuntimeInstalled = true;
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = ((input, init) => originalFetch(normalizeRequestInfo(input), init));
+    const NativeEventSource = window.EventSource;
+    if (NativeEventSource) {
+      window.EventSource = class YuanshuEventSource extends NativeEventSource {
+        constructor(url, eventSourceInitDict) {
+          const normalized = typeof url === "string" ? yuanshuPath(url) : normalizeRequestInfo(url);
+          super(normalized, eventSourceInitDict);
+        }
+      };
+    }
+  }
 
   // codex_image/webui/frontend/src/dom.ts
   function getEls() {
@@ -27303,7 +27340,7 @@ ${hint}` : hint;
       return `
     <div class="recent-asset-button" title="${escapeHtml4(name)}">
       <button class="recent-asset-use" type="button" data-reference-asset-id="${escapeHtml4(item.id)}" aria-label="${escapeHtml4(formatTranslation("recentAssets.use", { name }))}">
-        <img src="${escapeHtml4(item.image_url)}" alt="${escapeHtml4(name)}">
+        <img src="${escapeHtml4(yuanshuPath(item.image_url))}" alt="${escapeHtml4(name)}">
         <span>${escapeHtml4(name)}</span>
       </button>
       <button class="recent-asset-delete" type="button" data-reference-asset-delete="${escapeHtml4(item.id)}" aria-label="${escapeHtml4(formatTranslation("recentAssets.delete", { name }))}">\xD7</button>
@@ -27483,7 +27520,7 @@ ${hint}` : hint;
       return;
     }
     els4.quickGalleryPreview.innerHTML = `
-    <img src="${escapeHtml5(item.image_url)}" alt="${escapeHtml5(item.name)}">
+    <img src="${escapeHtml5(yuanshuPath(item.image_url))}" alt="${escapeHtml5(item.name)}">
     <span>${escapeHtml5(item.name)}</span>
   `;
     els4.quickGalleryPreview.classList.add("visible");
@@ -27801,7 +27838,7 @@ ${hint}` : hint;
         <span>${translate("gallery.dragSort")}</span>
       </button>
       <div class="gallery-card-media">
-        <img src="${escapeHtml6(item.image_url)}" alt="${escapeHtml6(item.name)}" draggable="false">
+        <img src="${escapeHtml6(yuanshuPath(item.image_url))}" alt="${escapeHtml6(item.name)}" draggable="false">
       </div>
       <div class="gallery-card-body">
         <div class="gallery-card-heading">
@@ -29212,7 +29249,7 @@ ${hint}` : hint;
     if (els10.apiImagesConcurrency) els10.apiImagesConcurrency.value = String(normalizeApiImagesConcurrency(provider.images_concurrency));
     if (els10.apiKey) {
       els10.apiKey.value = provider.api_key || "";
-      els10.apiKey.placeholder = provider.api_key_set && !provider.api_key ? translate("apiSettings.savedKeyPlaceholder") : "sk-...";
+      els10.apiKey.placeholder = provider.api_key_set && !provider.api_key ? translate("apiSettings.savedKeyPlaceholder") : "\u7531\u5143\u67A2\u81EA\u52A8\u914D\u7F6E";
     }
   }
   function renderApiProviderList() {
@@ -31623,7 +31660,7 @@ ${hint}` : hint;
     }
     els15.promptTemplateList.innerHTML = templates.map((template) => `
     <button class="prompt-template-card" type="button" data-prompt-template-id="${escapeHtml10(template.id)}">
-      ${template.thumbnail_url ? `<span class="prompt-template-card-thumb"><img src="${escapeHtml10(template.thumbnail_url)}" alt=""></span>` : ""}
+      ${template.thumbnail_url ? `<span class="prompt-template-card-thumb"><img src="${escapeHtml10(yuanshuPath(template.thumbnail_url))}" alt=""></span>` : ""}
       <span class="prompt-template-card-title">${escapeHtml10(template.short_title)}</span>
       <span class="prompt-template-card-subtitle">${escapeHtml10(template.title)}</span>
       <span class="prompt-template-card-preview">${escapeHtml10(promptTemplatePreview(template.content, 64))}</span>
@@ -31659,7 +31696,7 @@ ${hint}` : hint;
       <button class="ghost-button text-sm" type="button" data-prompt-template-back>${translate("templates.back")}</button>
       <button class="ghost-button text-sm" type="button" data-prompt-template-edit="${escapeHtml10(template.id)}">${translate("templates.edit")}</button>
     </div>
-    ${template.thumbnail_url ? `<img class="prompt-template-detail-thumb" src="${escapeHtml10(template.thumbnail_url)}" alt="">` : ""}
+    ${template.thumbnail_url ? `<img class="prompt-template-detail-thumb" src="${escapeHtml10(yuanshuPath(template.thumbnail_url))}" alt="">` : ""}
     <h3>${escapeHtml10(template.title)}</h3>
     <div class="prompt-template-detail-meta">
       <span>${escapeHtml10(promptTemplateCategoryLabel(template.category))}</span>
@@ -31819,7 +31856,7 @@ ${hint}` : hint;
     const input = form.querySelector("[data-prompt-template-thumbnail-url]");
     if (input) input.value = selectedUrl;
     if (preview) {
-      preview.innerHTML = selectedUrl ? `<img src="${escapeHtml10(selectedUrl)}" alt=""><span>${escapeHtml10(promptTemplatePreview(selectedUrl, 30))}</span>` : `<span>${escapeHtml10(translate("templates.thumbnailNone"))}</span>`;
+      preview.innerHTML = selectedUrl ? `<img src="${escapeHtml10(yuanshuPath(selectedUrl))}" alt=""><span>${escapeHtml10(promptTemplatePreview(selectedUrl, 30))}</span>` : `<span>${escapeHtml10(translate("templates.thumbnailNone"))}</span>`;
     }
     if (!picker) return;
     const thumbnails = historyTemplateThumbnails();
@@ -31829,7 +31866,7 @@ ${hint}` : hint;
     }
     picker.innerHTML = thumbnails.map((item) => `
     <button class="prompt-template-thumbnail-option ${item.url === selectedUrl ? "active" : ""}" type="button" data-prompt-template-thumbnail-select="${escapeHtml10(item.url)}" title="${escapeHtml10(item.label)}">
-      <img src="${escapeHtml10(item.url)}" alt="">
+      <img src="${escapeHtml10(yuanshuPath(item.url))}" alt="">
     </button>
   `).join("");
   }
@@ -32508,7 +32545,7 @@ ${hint}` : hint;
     }
     els17.mentionSuggest.innerHTML = items.map((item) => `
     <button type="button" class="mention-option" data-mention-id="${escapeHtml11(item.id)}">
-      <img src="${escapeHtml11(item.image_url)}" alt="">
+      <img src="${escapeHtml11(yuanshuPath(item.image_url))}" alt="">
       <span>@${escapeHtml11(item.name)}</span>
       <small>${escapeHtml11(categoryLabel5(item.category))}</small>
     </button>
@@ -35354,7 +35391,7 @@ ${galleryText}`;
     if (query) return "";
     if (!tasks.some((task) => !isAlwaysVisibleTask(task))) return "";
     return `
-    <a class="task-history-library-card" href="/history">
+    <a class="task-history-library-card" href="${yuanshuPath("/history")}">
       <span>${escapeHtml13(translate("footer.historyLibrary"))}</span>
       <small>${escapeHtml13(translate("historyLibrary.openFull"))}</small>
     </a>
@@ -36807,6 +36844,9 @@ ${galleryText}`;
   function renderPreview4(...args) {
     return legacyMethod34("renderPreview", ...args);
   }
+  function isYuanshuMode() {
+    return document.documentElement.dataset.yuanshuMode === "true";
+  }
   function applyTaskToForm(task) {
     const params = task.params || {};
     setMode5(task.mode || "generate");
@@ -36872,11 +36912,12 @@ ${galleryText}`;
     const uploads = uploadInputs3();
     const galleries = galleryInputs4();
     const assets = referenceAssetInputs3();
-    const authSource = currentAuthSource3();
+    const yuanshuMode = isYuanshuMode();
+    const authSource = yuanshuMode ? "api" : currentAuthSource3();
     const isApi = authSource === "api";
     const isCodex = authSource === "codex";
     const codexMode = isCodex ? currentCodexMode4() : null;
-    const requestedBackend = backendForAuthSource2(authSource, isApi ? currentApiMode4() : null, codexMode);
+    const requestedBackend = yuanshuMode ? "openai_images" : backendForAuthSource2(authSource, isApi ? currentApiMode4() : null, codexMode);
     const payload2 = {
       mode: state24.mode,
       auth_source: authSource,
@@ -36897,10 +36938,10 @@ ${galleryText}`;
       reference_asset_ids: assets.map((source) => source.id)
     };
     if (isApi) {
-      const apiMode = currentApiMode4();
-      const action = state24.mode === "edit" || uploads.length || assets.length || galleries.length ? "edit" : "generate";
-      payload2.api_provider_id = currentApiProviderId3();
-      payload2.api_provider_name = currentApiProviderLabel3();
+      const apiMode = yuanshuMode ? "images" : currentApiMode4();
+      const action = yuanshuMode ? "generate" : state24.mode === "edit" || uploads.length || assets.length || galleries.length ? "edit" : "generate";
+      payload2.api_provider_id = yuanshuMode ? "yuanshu" : currentApiProviderId3();
+      payload2.api_provider_name = yuanshuMode ? "\u5143\u67A2" : currentApiProviderLabel3();
       payload2.webui_api_provider_id = payload2.api_provider_id;
       payload2.webui_api_provider_name = payload2.api_provider_name;
       payload2.api_mode = apiMode;
@@ -37000,6 +37041,7 @@ ${galleryText}`;
     const uploads = uploadInputs3();
     const galleries = galleryInputs4();
     const assets = referenceAssetInputs3();
+    const yuanshuMode = isYuanshuMode();
     if (missingGalleryInputs2().length) {
       setStatus17(translate("status.missingGalleryReference"), "error");
       return;
@@ -37012,7 +37054,7 @@ ${galleryText}`;
       setStatus17(translate("status.emptyPrompt"), "error");
       return;
     }
-    if (state24.mode === "edit" && !uploads.length && !assets.length && !galleries.length) {
+    if (!yuanshuMode && state24.mode === "edit" && !uploads.length && !assets.length && !galleries.length) {
       setStatus17(translate("status.editNeedsImage"), "error");
       return;
     }
@@ -37039,9 +37081,9 @@ ${galleryText}`;
     form.append("n", String(params.n));
     form.append("prompt_fidelity", currentPromptFidelity3());
     if (params.web_search) form.append("web_search", "true");
-    if (currentAuthSource3() === "api") {
-      form.append("api_provider_id", currentApiProviderId3());
-      form.append("api_mode", currentApiMode4());
+    if (yuanshuMode || currentAuthSource3() === "api") {
+      form.append("api_provider_id", yuanshuMode ? "yuanshu" : currentApiProviderId3());
+      form.append("api_mode", yuanshuMode ? "images" : currentApiMode4());
     } else if (currentAuthSource3() === "codex") {
       form.append("codex_mode", currentCodexMode4());
     }
@@ -37050,7 +37092,7 @@ ${galleryText}`;
     }
     galleries.forEach((source) => form.append("gallery_image_ids", source.id));
     assets.forEach((source) => form.append("reference_asset_ids", source.id));
-    if (state24.mode === "generate") {
+    if (yuanshuMode || state24.mode === "generate") {
       uploads.forEach((source) => form.append("reference_images", source.file));
     } else {
       uploads.forEach((source) => form.append("images", source.file));
@@ -37065,7 +37107,7 @@ ${galleryText}`;
     const controller = new AbortController();
     const submitTimeoutId = window.setTimeout(() => controller.abort(), SUBMIT_TASK_TIMEOUT_MS);
     try {
-      const response = await fetch(state24.mode === "edit" ? "/api/edit" : "/api/generate", {
+      const response = await fetch(!yuanshuMode && state24.mode === "edit" ? "/api/edit" : "/api/generate", {
         method: "POST",
         body: form,
         signal: controller.signal
@@ -38466,16 +38508,16 @@ ${galleryText}`;
     const bridge39 = getLegacyBridge();
     const urls = bridge39.methods.taskThumbnailUrls?.(task);
     if (Array.isArray(urls) && urls[0]) return String(urls[0]);
-    if (Array.isArray(task.thumbnail_urls) && task.thumbnail_urls[0]) return String(task.thumbnail_urls[0]);
+    if (Array.isArray(task.thumbnail_urls) && task.thumbnail_urls[0]) return yuanshuPath(String(task.thumbnail_urls[0]));
     const output = Array.isArray(task.outputs) ? task.outputs.find((record) => record?.status === "completed") : null;
-    if (output?.thumbnail_url) return String(output.thumbnail_url);
+    if (output?.thumbnail_url) return yuanshuPath(String(output.thumbnail_url));
     if (output?.thumbnail_file) return outputFileUrl(output.thumbnail_file);
     if (output?.url || output?.file) {
       const index = positiveNumber(output.index) || 1;
-      return `/api/tasks/${encodeURIComponent(task.task_id)}/outputs/${index}/thumbnail`;
+      return yuanshuPath(`/api/tasks/${encodeURIComponent(task.task_id)}/outputs/${index}/thumbnail`);
     }
     if (Array.isArray(task.output_urls) && task.output_urls.some(Boolean)) {
-      return `/api/tasks/${encodeURIComponent(task.task_id)}/outputs/1/thumbnail`;
+      return yuanshuPath(`/api/tasks/${encodeURIComponent(task.task_id)}/outputs/1/thumbnail`);
     }
     return void 0;
   }
@@ -38486,7 +38528,7 @@ ${galleryText}`;
   </button>`;
   }
   function taskNotificationInnerHtml(notification) {
-    const thumbnail = notification.thumbnail_url ? `<img class="task-notification-thumb" src="${escapeHtml17(notification.thumbnail_url)}" alt="">` : `<span class="task-notification-thumb task-notification-thumb-placeholder" aria-hidden="true">${escapeHtml17(statusGlyph(notification.status))}</span>`;
+    const thumbnail = notification.thumbnail_url ? `<img class="task-notification-thumb" src="${escapeHtml17(yuanshuPath(notification.thumbnail_url))}" alt="">` : `<span class="task-notification-thumb task-notification-thumb-placeholder" aria-hidden="true">${escapeHtml17(statusGlyph(notification.status))}</span>`;
     return `${thumbnail}
     <span class="task-notification-body">
       <span class="task-notification-title">${escapeHtml17(taskNotificationDisplayTitle(notification))}</span>
@@ -38730,22 +38772,22 @@ ${galleryText}`;
   }
   function taskInputUrls(task) {
     if (Array.isArray(task.input_urls) && task.input_urls.length) {
-      return task.input_urls;
+      return task.input_urls.map((url) => yuanshuPath(String(url || ""))).filter(Boolean);
     }
     if (!Array.isArray(task.input_files) || !task.task_id) {
       return [];
     }
-    return task.input_files.map((filename) => `/inputs/${encodeURIComponent(filename)}`);
+    return task.input_files.map((filename) => yuanshuPath(`/inputs/${encodeURIComponent(filename)}`));
   }
   function taskInputThumbnailRoute(task, index) {
     const inputIndex = positiveInt(index);
     if (!task?.task_id || inputIndex === null) return "";
-    return `/api/tasks/${encodeURIComponent(task.task_id)}/inputs/${inputIndex}/thumbnail`;
+    return yuanshuPath(`/api/tasks/${encodeURIComponent(task.task_id)}/inputs/${inputIndex}/thumbnail`);
   }
   function taskInputThumbnailUrls(task) {
     if (!task) return [];
     if (Array.isArray(task.input_thumbnail_urls) && task.input_thumbnail_urls.length) {
-      return task.input_thumbnail_urls.filter(Boolean);
+      return task.input_thumbnail_urls.map((url) => yuanshuPath(String(url || ""))).filter(Boolean);
     }
     return taskInputUrls(task).map((_, index) => taskInputThumbnailRoute(task, index + 1)).filter(Boolean);
   }
@@ -38758,25 +38800,25 @@ ${galleryText}`;
       const inputUrls = taskInputUrls(task);
       let uploadInputIndex = 0;
       return task.input_sources.map((source) => {
-        if (source?.kind !== "upload") return source?.image_url;
+        if (source?.kind !== "upload") return yuanshuPath(source?.image_url || "");
         const fallbackUrl = inputUrls[uploadInputIndex];
         const thumbnailUrl = source.thumbnail_url || thumbnailUrls[uploadInputIndex];
         uploadInputIndex += 1;
-        if (thumbnailUrl) return thumbnailUrl;
+        if (thumbnailUrl) return yuanshuPath(thumbnailUrl);
         if (fallbackUrl && isLegacyOutputInputUrl(source.image_url)) return fallbackUrl;
-        return source.image_url || fallbackUrl;
+        return yuanshuPath(source.image_url || fallbackUrl);
       }).filter(Boolean);
     }
     return thumbnailUrls.length ? thumbnailUrls : taskInputUrls(task);
   }
   function outputFileUrl2(filename) {
     const clean = String(filename || "").split("/").filter(Boolean).map(encodeURIComponent).join("/");
-    return clean ? `/outputs/${clean}` : "";
+    return clean ? yuanshuPath(`/outputs/${clean}`) : "";
   }
   function taskThumbnailRoute(task, index) {
     const outputIndex = positiveInt(index);
     if (!task?.task_id || outputIndex === null) return "";
-    return `/api/tasks/${encodeURIComponent(task.task_id)}/outputs/${outputIndex}/thumbnail`;
+    return yuanshuPath(`/api/tasks/${encodeURIComponent(task.task_id)}/outputs/${outputIndex}/thumbnail`);
   }
   function taskThumbnailUrls2(task) {
     if (!task) return [];
@@ -38786,7 +38828,7 @@ ${galleryText}`;
       const clean = String(url || "").trim();
       const outputIndex = positiveInt(index);
       if (!clean || outputIndex !== null && deletedIndexes.has(outputIndex) || urls.includes(clean)) return;
-      urls.push(clean);
+      urls.push(yuanshuPath(clean));
     };
     if (Array.isArray(task.thumbnail_urls) && task.thumbnail_urls.length) {
       task.thumbnail_urls.forEach((url, fallbackIndex) => {
@@ -38818,10 +38860,10 @@ ${galleryText}`;
         const record = Array.isArray(task?.outputs) ? task.outputs.find((item) => taskOutputRecordMatchesUrl(item, url)) : null;
         const index = positiveInt(record?.index) || taskOutputIndexFromUrl(url) || fallbackIndex + 1;
         return !deletedIndexes.has(index) && !taskOutputRecordIsDeleted(record);
-      });
+      }).map((url) => yuanshuPath(String(url || "")));
     }
     const singleIndex = taskOutputIndexFromUrl(task.output_url) || 1;
-    if (task.output_url && !deletedIndexes.has(singleIndex)) return [task.output_url];
+    if (task.output_url && !deletedIndexes.has(singleIndex)) return [yuanshuPath(task.output_url)];
     return [];
   }
   function taskDeletedOutputIndexes(task) {
@@ -39598,7 +39640,7 @@ ${galleryText}`;
   }
   function updatePreviewOutputCard(card, task, url, index, totalCount, { preservePreviousImage = true, imageAlreadyLoaded = false } = {}) {
     const outputIndex = taskOutputIndex2(task, url, index);
-    const outputUrl = String(url || "");
+    const outputUrl = yuanshuPath(String(url || ""));
     const downloadName = outputDownloadFilename(task, url, index);
     card.setAttribute("data-preview-card-key", previewOutputCardKey(task, url, index));
     card.setAttribute("data-preview-output-url", outputUrl);
@@ -39867,7 +39909,7 @@ ${galleryText}`;
   }
   function taskOutputZipUrl(task, { selected = false } = {}) {
     const url = `/api/tasks/${encodeURIComponent(String(task?.task_id || ""))}/outputs.zip`;
-    return selected ? `${url}?selected=1` : url;
+    return yuanshuPath(selected ? `${url}?selected=1` : url);
   }
   async function updateTaskOutputSelection(taskId, outputIndex, selected) {
     try {
@@ -41384,7 +41426,7 @@ ${galleryText}`;
       source.textContent = payload?.source === "portable" ? translate("version.sourcePortable") : translate("version.sourceSource");
     }
     if (releaseLink) {
-      releaseLink.href = payload?.release_url || "https://github.com/kadevin/ilab-gpt-conjure/releases";
+      releaseLink.href = payload?.release_url || "/image-playground/";
     }
     if (updateButton) {
       updateButton.disabled = !(payload?.update_available && payload?.updater_available);
@@ -41405,7 +41447,7 @@ ${galleryText}`;
         source: "source",
         update_available: false,
         updater_available: false,
-        release_url: "https://github.com/kadevin/ilab-gpt-conjure/releases"
+        release_url: "/image-playground/"
       };
     }
     renderAppVersion();
@@ -41646,7 +41688,54 @@ ${galleryText}`;
     });
   }
 
+  // codex_image/webui/frontend/src/yuanshu.ts
+  function applyYuanshuChrome() {
+    document.documentElement.dataset.yuanshuMode = "true";
+    document.title = "\u5143\u67A2\u5728\u7EBF\u751F\u56FE";
+    const brandName = document.querySelector(".brand-name");
+    const brandSubtitle = document.querySelector(".brand-subtitle");
+    if (brandName) brandName.textContent = "\u5143\u67A2";
+    if (brandSubtitle) brandSubtitle.textContent = "\u5728\u7EBF\u751F\u56FE";
+  }
+  async function postYuanshuBootstrap(payload2) {
+    const response = await fetch("/api/yuanshu/bootstrap", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload2)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.detail || "\u5143\u67A2\u5728\u7EBF\u751F\u56FE\u521D\u59CB\u5316\u5931\u8D25");
+    }
+    return data;
+  }
+  function isBootstrapMessage(event) {
+    return event.origin === window.location.origin && event.data && typeof event.data === "object" && event.data.type === "yuanshu:image-playground-bootstrap";
+  }
+  function initYuanshuModeFeature() {
+    applyYuanshuChrome();
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "yuanshu:image-playground-ready" }, window.location.origin);
+    }
+    window.addEventListener("message", async (event) => {
+      if (!isBootstrapMessage(event)) return;
+      try {
+        await postYuanshuBootstrap(event.data.payload || {});
+        const bridge39 = getLegacyBridge();
+        bridge39.state.authAvailable = true;
+        bridge39.state.mode = "generate";
+        bridge39.methods.setMode?.("generate");
+        bridge39.methods.setStatus?.("\u5143\u67A2\u5728\u7EBF\u751F\u56FE\u5DF2\u5C31\u7EEA", "ok");
+        await bridge39.methods.refreshHealth?.();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "\u5143\u67A2\u5728\u7EBF\u751F\u56FE\u521D\u59CB\u5316\u5931\u8D25";
+        getLegacyBridge().methods.setStatus?.(message, "error");
+      }
+    });
+  }
+
   // codex_image/webui/frontend/src/main.ts
+  installYuanshuPathRuntime();
   initInputSourcesFeature();
   initImageEditorFeature();
   initImageStripFeature();
@@ -41688,5 +41777,6 @@ ${galleryText}`;
   initializeQueueFeature();
   initSegmentedIndicatorFeature();
   window.__codexImageWebUI?.boot();
+  initYuanshuModeFeature();
 })();
 //# sourceMappingURL=app.js.map

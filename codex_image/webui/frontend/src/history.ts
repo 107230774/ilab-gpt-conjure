@@ -1,4 +1,5 @@
 import { LOCALE_CHANGE_EVENT, formatTranslation, restoreLocalePreference, translate } from "./i18n";
+import { installYuanshuPathRuntime, yuanshuPath } from "./yuanshu-paths";
 import {
   historyDetailImagesHtml,
   historyDetailImagesLayoutClass,
@@ -68,6 +69,7 @@ type HistoryContextMenuMode = "single" | "multi";
 type HistoryResizerSide = "left" | "right";
 
 const HISTORY_FILTER_KEYS: HistoryFilterKey[] = ["month", "prompt_mode", "quality", "ratio", "orientation", "backend", "provider", "archived"];
+installYuanshuPathRuntime();
 const HISTORY_RATIO_OTHER_VALUE = "__other__";
 const HISTORY_PAGE_LIMIT = 50;
 const MAX_MOUNTED_TASK_CARDS = 300;
@@ -1052,13 +1054,13 @@ function historyThumbnailUrl(task: HistoryTask): string {
     const outputIndex = staticThumbMatch[2] || "1";
     return versionHistoryThumbnailUrl(`/api/tasks/${encodeURIComponent(task.task_id)}/outputs/${encodeURIComponent(outputIndex)}/thumbnail`);
   }
-  return versionHistoryThumbnailUrl(url);
+  return yuanshuPath(versionHistoryThumbnailUrl(url));
 }
 
 function versionHistoryThumbnailUrl(url: string): string {
   if (!url.startsWith("/api/tasks/") || !url.includes("/thumbnail")) return url;
   const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}v=${HISTORY_THUMBNAIL_CACHE_VERSION}`;
+  return yuanshuPath(`${url}${separator}v=${HISTORY_THUMBNAIL_CACHE_VERSION}`);
 }
 
 function updateTaskSelectionVisuals(taskId = historyState.selectedTaskId): void {
@@ -1198,7 +1200,7 @@ function renderTaskDetail(task: any): void {
   const images = historyDetailImagesHtml(taskId, urls, selectedCount);
   const imageLayoutClass = historyDetailImagesLayoutClass(urls);
   const inputReferences = historyInputReferencesHtml(task);
-  const zipHref = `/api/tasks/${encodeURIComponent(taskId)}/outputs.zip`;
+  const zipHref = yuanshuPath(`/api/tasks/${encodeURIComponent(taskId)}/outputs.zip`);
   const canZip = urls.length > 1;
   const canDeleteUnselected = selectedCount > 0 && selectedCount < urls.length;
   const confirmingDeleteUnselected = historyState.deleteUnselectedConfirmTaskId === taskId;
@@ -1683,7 +1685,7 @@ async function copyHistoryTaskPrompts(taskIds: string[]): Promise<void> {
 function triggerHistoryDownload(url: string, filename = ""): void {
   if (!url) return;
   const link = document.createElement("a");
-  link.href = url;
+  link.href = yuanshuPath(url);
   if (filename) {
     link.download = filename;
   } else {
@@ -1702,7 +1704,7 @@ async function downloadHistoryTask(taskId: string): Promise<boolean> {
   if (records.length === 1) {
     triggerHistoryDownload(records[0]?.url || "");
   } else {
-    triggerHistoryDownload(`/api/tasks/${encodeURIComponent(taskId)}/outputs.zip`, `${taskId}-images.zip`);
+    triggerHistoryDownload(yuanshuPath(`/api/tasks/${encodeURIComponent(taskId)}/outputs.zip`), `${taskId}-images.zip`);
   }
   return true;
 }

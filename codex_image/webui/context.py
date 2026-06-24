@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from .queue import QueueManager
 from .settings_store import ApiSettings, AuthSettings, ColorPaletteSettings, PromptSnippetSettings, PromptTemplateSettings, WebUISettings
 from .storage import GalleryStorage, QueueStorage, ReferenceAssetStorage, SQLiteQueueStorage, TaskStorage
+from .yuanshu import YuanshuBootstrapState
 
 ClientFactory = Callable[[], Any]
 AuthChecker = Callable[[], bool]
@@ -39,6 +40,7 @@ class WebUIContext:
     active_task_ids: set[str] = field(default_factory=set)
     running_worker_tasks: dict[str, Any] = field(default_factory=dict)
     api_request_semaphores: dict[str, dict[str, Any]] = field(default_factory=dict)
+    yuanshu: YuanshuBootstrapState = field(default_factory=YuanshuBootstrapState)
     route_helpers: dict[str, Any] = field(default_factory=dict)
 
     def install_on_app_state(self) -> None:
@@ -62,6 +64,7 @@ class WebUIContext:
         self.app.state.active_task_ids = self.active_task_ids
         self.app.state.running_worker_tasks = self.running_worker_tasks
         self.app.state.api_request_semaphores = self.api_request_semaphores
+        self.app.state.yuanshu = self.yuanshu
         self.app.state.route_helpers = self.route_helpers
         if self.queue_manager is not None:
             self.app.state.queue_manager = self.queue_manager

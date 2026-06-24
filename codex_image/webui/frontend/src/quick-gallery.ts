@@ -1,6 +1,7 @@
 import { getLegacyBridge } from "./state";
 import { formatTranslation } from "./i18n";
 import { prefersReducedMotion } from "./webui-utils";
+import { yuanshuPath } from "./yuanshu-paths";
 
 const QUICK_GALLERY_WHEEL_COOLDOWN_MS = 220;
 const bridge = getLegacyBridge();
@@ -92,7 +93,7 @@ function previewQuickGalleryItem(itemId: any) {
     return;
   }
   els.quickGalleryPreview.innerHTML = `
-    <img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.name)}">
+    <img src="${escapeHtml(yuanshuPath(item.image_url))}" alt="${escapeHtml(item.name)}">
     <span>${escapeHtml(item.name)}</span>
   `;
   els.quickGalleryPreview.classList.add("visible");

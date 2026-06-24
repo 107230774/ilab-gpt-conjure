@@ -119,7 +119,7 @@
     "footer.archiveCount": "Archive {count}",
     "footer.historyLibrary": "History",
     "historyLibrary.openFull": "Open full history library",
-    "history.documentTitle": "History - iLab GPT CONJURE",
+    "history.documentTitle": "History - Yuanshu Image",
     "history.back": "Back to generator",
     "history.title": "History",
     "history.loading": "Loading",
@@ -1007,7 +1007,7 @@
     "footer.archiveCount": "Archiv {count}",
     "footer.historyLibrary": "Geschichte",
     "historyLibrary.openFull": "\xD6ffnen Sie die vollst\xE4ndige Geschichtsbibliothek",
-    "history.documentTitle": "Geschichte \u2013 iLab GPT CONJURE",
+    "history.documentTitle": "Geschichte \u2013 Yuanshu Image",
     "history.back": "Zur\xFCck zum Generator",
     "history.title": "Geschichte",
     "history.loading": "Laden",
@@ -1895,7 +1895,7 @@
     "footer.archiveCount": "Archivo {count}",
     "footer.historyLibrary": "Historia",
     "historyLibrary.openFull": "Abrir biblioteca de historia completa",
-    "history.documentTitle": "Historia - iLab GPT CONJURE",
+    "history.documentTitle": "Historia - Yuanshu Image",
     "history.back": "Volver al generador",
     "history.title": "Historia",
     "history.loading": "Cargando",
@@ -2783,7 +2783,7 @@
     "footer.archiveCount": "Archiver {count}",
     "footer.historyLibrary": "Histoire",
     "historyLibrary.openFull": "Ouvrir la biblioth\xE8que d'historique compl\xE8te",
-    "history.documentTitle": "Histoire - iLab GPT CONJURE",
+    "history.documentTitle": "Histoire - Yuanshu Image",
     "history.back": "Retour au g\xE9n\xE9rateur",
     "history.title": "Histoire",
     "history.loading": "Chargement",
@@ -3671,7 +3671,7 @@
     "footer.archiveCount": "\u30A2\u30FC\u30AB\u30A4\u30D6 {count}",
     "footer.historyLibrary": "\u5C65\u6B74",
     "historyLibrary.openFull": "\u5C65\u6B74\u30E9\u30A4\u30D6\u30E9\u30EA\u5168\u4F53\u3092\u958B\u304F",
-    "history.documentTitle": "\u5C65\u6B74 - iLab GPT CONJURE",
+    "history.documentTitle": "\u5C65\u6B74 - Yuanshu Image",
     "history.back": "\u30B8\u30A7\u30CD\u30EC\u30FC\u30BF\u30FC\u306B\u623B\u308B",
     "history.title": "\u5C65\u6B74",
     "history.loading": "\u8AAD\u307F\u8FBC\u307F\u4E2D",
@@ -4559,7 +4559,7 @@
     "footer.archiveCount": "\uBCF4\uAD00\uD568 {count}",
     "footer.historyLibrary": "\uAE30\uB85D",
     "historyLibrary.openFull": "\uC804\uCCB4 \uAE30\uB85D \uB77C\uC774\uBE0C\uB7EC\uB9AC \uC5F4\uAE30",
-    "history.documentTitle": "\uAE30\uB85D - iLab GPT CONJURE",
+    "history.documentTitle": "\uAE30\uB85D - Yuanshu Image",
     "history.back": "\uC0DD\uC131\uAE30\uB85C \uB3CC\uC544\uAC00\uAE30",
     "history.title": "\uAE30\uB85D",
     "history.loading": "\uB85C\uB4DC \uC911",
@@ -5447,7 +5447,7 @@
     "footer.archiveCount": "Arquivo {count}",
     "footer.historyLibrary": "Hist\xF3ria",
     "historyLibrary.openFull": "Abra a biblioteca de hist\xF3rico completa",
-    "history.documentTitle": "Hist\xF3ria - iLab GPT CONJURE",
+    "history.documentTitle": "Hist\xF3ria - Yuanshu Image",
     "history.back": "Voltar ao gerador",
     "history.title": "Hist\xF3ria",
     "history.loading": "Carregando",
@@ -6335,7 +6335,7 @@
     "footer.archiveCount": "\u0410\u0440\u0445\u0438\u0432 {count}",
     "footer.historyLibrary": "\u0418\u0441\u0442\u043E\u0440\u0438\u044F",
     "historyLibrary.openFull": "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u043E\u043B\u043D\u0443\u044E \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0443 \u0438\u0441\u0442\u043E\u0440\u0438\u0438",
-    "history.documentTitle": "\u0418\u0441\u0442\u043E\u0440\u0438\u044F - iLab GPT CONJURE",
+    "history.documentTitle": "\u0418\u0441\u0442\u043E\u0440\u0438\u044F - Yuanshu Image",
     "history.back": "\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u043A \u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u0443",
     "history.title": "\u0418\u0441\u0442\u043E\u0440\u0438\u044F",
     "history.loading": "\u0417\u0430\u0433\u0440\u0443\u0437\u043A\u0430",
@@ -7223,7 +7223,7 @@
     "footer.archiveCount": "Archivio {count}",
     "footer.historyLibrary": "Storia",
     "historyLibrary.openFull": "Apri la libreria della cronologia completa",
-    "history.documentTitle": "Storia - iLab GPT CONJURE",
+    "history.documentTitle": "Storia - Yuanshu Image",
     "history.back": "Torniamo al generatore",
     "history.title": "Storia",
     "history.loading": "Caricamento in corso",
@@ -8999,7 +8999,7 @@
     "footer.archiveCount": "\u4F1A\u8BDD\u5F52\u6863 {count}",
     "footer.historyLibrary": "\u5386\u53F2\u5E93",
     "historyLibrary.openFull": "\u6253\u5F00\u5B8C\u6574\u5386\u53F2\u5E93",
-    "history.documentTitle": "\u5386\u53F2\u5E93 - iLab GPT CONJURE",
+    "history.documentTitle": "\u5386\u53F2\u5E93 - Yuanshu Image",
     "history.back": "\u8FD4\u56DE\u751F\u6210\u9875",
     "history.title": "\u5386\u53F2\u5E93",
     "history.loading": "\u8F7D\u5165\u4E2D",
@@ -9887,7 +9887,7 @@
     "footer.archiveCount": "\u6703\u8A71\u6B78\u6A94{count}",
     "footer.historyLibrary": "\u6B77\u53F2\u5EAB",
     "historyLibrary.openFull": "\u958B\u555F\u5B8C\u6574\u6B77\u53F2\u5EAB",
-    "history.documentTitle": "\u6B77\u53F2\u5EAB - iLabGPTCONJURE",
+    "history.documentTitle": "\u6B77\u53F2\u5EAB - Yuanshu Image",
     "history.back": "\u8FD4\u56DE\u751F\u6210\u9801",
     "history.title": "\u6B77\u53F2\u5EAB",
     "history.loading": "\u8F09\u5165\u4E2D",
@@ -10775,7 +10775,7 @@
     "footer.archiveCount": "\u6703\u8A71\u6B78\u6A94{count}",
     "footer.historyLibrary": "\u6B77\u53F2\u5EAB",
     "historyLibrary.openFull": "\u958B\u555F\u5B8C\u6574\u6B77\u53F2\u5EAB",
-    "history.documentTitle": "\u6B77\u53F2\u5EAB - iLabGPTCONJURE",
+    "history.documentTitle": "\u6B77\u53F2\u5EAB - Yuanshu Image",
     "history.back": "\u8FD4\u56DE\u751F\u6210\u9801",
     "history.title": "\u6B77\u53F2\u5EAB",
     "history.loading": "\u8F09\u5165\u4E2D",
@@ -11679,6 +11679,43 @@
     setLocale(saved ? normalizeLocale(saved) : detectPreferredLocale(), { persist: false });
   }
 
+  // codex_image/webui/frontend/src/yuanshu-paths.ts
+  var YUANSHU_BASE_PATH = "/image-playground";
+  function isExternalUrl(value) {
+    return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(value);
+  }
+  function yuanshuPath(path) {
+    const value = String(path || "");
+    if (!value || isExternalUrl(value)) return value;
+    if (value === YUANSHU_BASE_PATH || value.startsWith(`${YUANSHU_BASE_PATH}/`)) return value;
+    if (value.startsWith("/")) return `${YUANSHU_BASE_PATH}${value}`;
+    return value;
+  }
+  function normalizeRequestInfo(input) {
+    if (typeof input === "string") return yuanshuPath(input);
+    if (input instanceof URL && input.origin === window.location.origin) {
+      const normalized = yuanshuPath(`${input.pathname}${input.search}${input.hash}`);
+      return new URL(normalized, window.location.origin);
+    }
+    return input;
+  }
+  function installYuanshuPathRuntime() {
+    const win = window;
+    if (win.__yuanshuPathRuntimeInstalled) return;
+    win.__yuanshuPathRuntimeInstalled = true;
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = ((input, init) => originalFetch(normalizeRequestInfo(input), init));
+    const NativeEventSource = window.EventSource;
+    if (NativeEventSource) {
+      window.EventSource = class YuanshuEventSource extends NativeEventSource {
+        constructor(url, eventSourceInitDict) {
+          const normalized = typeof url === "string" ? yuanshuPath(url) : normalizeRequestInfo(url);
+          super(normalized, eventSourceInitDict);
+        }
+      };
+    }
+  }
+
   // codex_image/webui/frontend/src/webui-utils.ts
   function escapeHtml(value) {
     return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
@@ -11721,7 +11758,7 @@
     const outputs = Array.isArray(task?.outputs) ? task.outputs : [];
     outputs.forEach((output, fallbackIndex) => {
       if (!output || output.deleted || output.status === "deleted") return;
-      const url = String(output.url || output.output_url || "");
+      const url = yuanshuPath(String(output.url || output.output_url || ""));
       if (!url || output.status === "failed") return;
       const outputIndex = positiveInt(output.index) || fallbackIndex + 1;
       const size = outputSizeForTask(task, fallbackIndex, output);
@@ -11740,7 +11777,7 @@
       const outputIndex = index + 1;
       const size = outputSizeForTask(task, index);
       return {
-        url: String(url),
+        url: yuanshuPath(String(url)),
         index: outputIndex,
         selected: selectedIndexes.has(outputIndex),
         revisedPrompt: String(task?.revised_prompts?.[index] || task?.revised_prompt || ""),
@@ -11765,8 +11802,8 @@
     const records = [];
     const seen = /* @__PURE__ */ new Set();
     const addRecord = (url, thumbnailUrl, label) => {
-      const fullUrl = String(url || thumbnailUrl || "");
-      const thumb = String(thumbnailUrl || url || "");
+      const fullUrl = yuanshuPath(String(url || thumbnailUrl || ""));
+      const thumb = yuanshuPath(String(thumbnailUrl || url || ""));
       if (!fullUrl || seen.has(fullUrl)) return;
       seen.add(fullUrl);
       records.push({
@@ -12199,6 +12236,7 @@
 
   // codex_image/webui/frontend/src/history.ts
   var HISTORY_FILTER_KEYS = ["month", "prompt_mode", "quality", "ratio", "orientation", "backend", "provider", "archived"];
+  installYuanshuPathRuntime();
   var HISTORY_RATIO_OTHER_VALUE = "__other__";
   var HISTORY_PAGE_LIMIT = 50;
   var MAX_MOUNTED_TASK_CARDS = 300;
@@ -13061,12 +13099,12 @@
       const outputIndex = staticThumbMatch[2] || "1";
       return versionHistoryThumbnailUrl(`/api/tasks/${encodeURIComponent(task.task_id)}/outputs/${encodeURIComponent(outputIndex)}/thumbnail`);
     }
-    return versionHistoryThumbnailUrl(url);
+    return yuanshuPath(versionHistoryThumbnailUrl(url));
   }
   function versionHistoryThumbnailUrl(url) {
     if (!url.startsWith("/api/tasks/") || !url.includes("/thumbnail")) return url;
     const separator = url.includes("?") ? "&" : "?";
-    return `${url}${separator}v=${HISTORY_THUMBNAIL_CACHE_VERSION}`;
+    return yuanshuPath(`${url}${separator}v=${HISTORY_THUMBNAIL_CACHE_VERSION}`);
   }
   function updateTaskSelectionVisuals(taskId = historyState.selectedTaskId) {
     els.taskList?.querySelectorAll(".history-task-card").forEach((card) => {
@@ -13192,7 +13230,7 @@
     const images = historyDetailImagesHtml(taskId, urls, selectedCount);
     const imageLayoutClass = historyDetailImagesLayoutClass(urls);
     const inputReferences = historyInputReferencesHtml(task);
-    const zipHref = `/api/tasks/${encodeURIComponent(taskId)}/outputs.zip`;
+    const zipHref = yuanshuPath(`/api/tasks/${encodeURIComponent(taskId)}/outputs.zip`);
     const canZip = urls.length > 1;
     const canDeleteUnselected = selectedCount > 0 && selectedCount < urls.length;
     const confirmingDeleteUnselected = historyState.deleteUnselectedConfirmTaskId === taskId;
@@ -13640,7 +13678,7 @@
   function triggerHistoryDownload(url, filename = "") {
     if (!url) return;
     const link = document.createElement("a");
-    link.href = url;
+    link.href = yuanshuPath(url);
     if (filename) {
       link.download = filename;
     } else {
@@ -13658,7 +13696,7 @@
     if (records.length === 1) {
       triggerHistoryDownload(records[0]?.url || "");
     } else {
-      triggerHistoryDownload(`/api/tasks/${encodeURIComponent(taskId)}/outputs.zip`, `${taskId}-images.zip`);
+      triggerHistoryDownload(yuanshuPath(`/api/tasks/${encodeURIComponent(taskId)}/outputs.zip`), `${taskId}-images.zip`);
     }
     return true;
   }

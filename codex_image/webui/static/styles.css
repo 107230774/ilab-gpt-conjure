@@ -11365,3 +11365,30 @@ body.history-lightbox-open {
     transition: none;
   }
 }
+
+/* source: styles/yuanshu.css */
+html[data-yuanshu-mode="true"] #githubLink,
+html[data-yuanshu-mode="true"] #authSourceGroup,
+html[data-yuanshu-mode="true"] #apiSourceSettingsButton,
+html[data-yuanshu-mode="true"] #apiDirectSettingsButton,
+html[data-yuanshu-mode="true"] #apiDirectSettingsNotice,
+html[data-yuanshu-mode="true"] #versionInfo,
+html[data-yuanshu-mode="true"] #systemSettingsApiTab,
+html[data-yuanshu-mode="true"] #systemSettingsCodexTab,
+html[data-yuanshu-mode="true"] #systemSettingsApiPanel,
+html[data-yuanshu-mode="true"] #systemSettingsCodexPanel,
+html[data-yuanshu-mode="true"] .image-input-section,
+html[data-yuanshu-mode="true"] #recentAssetDock,
+html[data-yuanshu-mode="true"] #imageEditorModal,
+html[data-yuanshu-mode="true"] #webSearchField,
+html[data-yuanshu-mode="true"] .api-status-bar {
+  display: none !important;
+}
+
+html[data-yuanshu-mode="true"] .brand {
+  cursor: default;
+}
+
+html[data-yuanshu-mode="true"] .brand-name {
+  letter-spacing: 0;
+}

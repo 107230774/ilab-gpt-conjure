@@ -64,6 +64,10 @@ function markPendingTaskFailed(...args: any[]) { return legacyMethod("markPendin
 function refreshRecentAssets(...args: any[]) { return legacyMethod("refreshRecentAssets", ...args); }
 function renderPreview(...args: any[]) { return legacyMethod("renderPreview", ...args); }
 
+function isYuanshuMode(): boolean {
+  return document.documentElement.dataset.yuanshuMode === "true";
+}
+
 function applyTaskToForm(task: any) {
   const params = task.params || {};
   setMode(task.mode || "generate");
@@ -136,11 +140,12 @@ function buildPreviewRequest() {
   const uploads = uploadInputs();
   const galleries = galleryInputs();
   const assets = referenceAssetInputs();
-  const authSource = currentAuthSource();
+  const yuanshuMode = isYuanshuMode();
+  const authSource = yuanshuMode ? "api" : currentAuthSource();
   const isApi = authSource === "api";
   const isCodex = authSource === "codex";
   const codexMode = isCodex ? currentCodexMode() : null;
-  const requestedBackend = backendForAuthSource(authSource, isApi ? currentApiMode() : null, codexMode);
+  const requestedBackend = yuanshuMode ? "openai_images" : backendForAuthSource(authSource, isApi ? currentApiMode() : null, codexMode);
   const payload: Record<string, any> = {
     mode: state.mode,
     auth_source: authSource,
@@ -161,10 +166,10 @@ function buildPreviewRequest() {
     reference_asset_ids: assets.map((source: any) => source.id),
   };
   if (isApi) {
-    const apiMode = currentApiMode();
-    const action = state.mode === "edit" || uploads.length || assets.length || galleries.length ? "edit" : "generate";
-    payload.api_provider_id = currentApiProviderId();
-    payload.api_provider_name = currentApiProviderLabel();
+    const apiMode = yuanshuMode ? "images" : currentApiMode();
+    const action = yuanshuMode ? "generate" : (state.mode === "edit" || uploads.length || assets.length || galleries.length ? "edit" : "generate");
+    payload.api_provider_id = yuanshuMode ? "yuanshu" : currentApiProviderId();
+    payload.api_provider_name = yuanshuMode ? "元枢" : currentApiProviderLabel();
     payload.webui_api_provider_id = payload.api_provider_id;
     payload.webui_api_provider_name = payload.api_provider_name;
     payload.api_mode = apiMode;
@@ -271,6 +276,7 @@ async function runTask() {
   const uploads = uploadInputs();
   const galleries = galleryInputs();
   const assets = referenceAssetInputs();
+  const yuanshuMode = isYuanshuMode();
   if (missingGalleryInputs().length) {
     setStatus(translate("status.missingGalleryReference"), "error");
     return;
@@ -283,7 +289,7 @@ async function runTask() {
     setStatus(translate("status.emptyPrompt"), "error");
     return;
   }
-  if (state.mode === "edit" && !uploads.length && !assets.length && !galleries.length) {
+  if (!yuanshuMode && state.mode === "edit" && !uploads.length && !assets.length && !galleries.length) {
     setStatus(translate("status.editNeedsImage"), "error");
     return;
   }
@@ -311,9 +317,9 @@ async function runTask() {
   form.append("n", String(params.n));
   form.append("prompt_fidelity", currentPromptFidelity());
   if (params.web_search) form.append("web_search", "true");
-  if (currentAuthSource() === "api") {
-    form.append("api_provider_id", currentApiProviderId());
-    form.append("api_mode", currentApiMode());
+  if (yuanshuMode || currentAuthSource() === "api") {
+    form.append("api_provider_id", yuanshuMode ? "yuanshu" : currentApiProviderId());
+    form.append("api_mode", yuanshuMode ? "images" : currentApiMode());
   } else if (currentAuthSource() === "codex") {
     form.append("codex_mode", currentCodexMode());
   }
@@ -323,7 +329,7 @@ async function runTask() {
   galleries.forEach((source: any) => form.append("gallery_image_ids", source.id));
   assets.forEach((source: any) => form.append("reference_asset_ids", source.id));
 
-  if (state.mode === "generate") {
+  if (yuanshuMode || state.mode === "generate") {
     uploads.forEach((source: any) => form.append("reference_images", source.file));
   } else {
     uploads.forEach((source: any) => form.append("images", source.file));
@@ -340,7 +346,7 @@ async function runTask() {
   const controller = new AbortController();
   const submitTimeoutId = window.setTimeout(() => controller.abort(), SUBMIT_TASK_TIMEOUT_MS);
   try {
-    const response = await fetch(state.mode === "edit" ? "/api/edit" : "/api/generate", {
+    const response = await fetch(!yuanshuMode && state.mode === "edit" ? "/api/edit" : "/api/generate", {
       method: "POST",
       body: form,
       signal: controller.signal,

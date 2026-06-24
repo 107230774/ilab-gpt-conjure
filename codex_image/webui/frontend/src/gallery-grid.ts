@@ -1,6 +1,7 @@
 import { getLegacyBridge } from "./state";
 import { setGalleryDragPreview } from "./gallery-drag-preview";
 import { formatTranslation, LOCALE_CHANGE_EVENT, translate } from "./i18n";
+import { yuanshuPath } from "./yuanshu-paths";
 
 const GALLERY_GRID_TRANSITION_MS = 220;
 const bridge = getLegacyBridge();
@@ -171,7 +172,7 @@ function galleryGridContentHtml(items: any) {
         <span>${translate("gallery.dragSort")}</span>
       </button>
       <div class="gallery-card-media">
-        <img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.name)}" draggable="false">
+        <img src="${escapeHtml(yuanshuPath(item.image_url))}" alt="${escapeHtml(item.name)}" draggable="false">
       </div>
       <div class="gallery-card-body">
         <div class="gallery-card-heading">

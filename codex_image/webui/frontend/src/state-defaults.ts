@@ -13,13 +13,13 @@ export const DEFAULT_GALLERY_CATEGORIES = [
 ];
 
 export const PROMPT_SNIPPETS_ENDPOINT = "/api/prompt-snippets";
-export const DEFAULT_API_BASE_URL = "https://api.openai.com/v1";
+export const DEFAULT_API_BASE_URL = "/image-playground/api/v1";
 export const DEFAULT_API_IMAGE_MODEL = "gpt-image-2";
 export const DEFAULT_API_MODE = "images";
 export const DEFAULT_CODEX_MODE = "images";
 export const DEFAULT_API_IMAGES_CONCURRENCY = 4;
 export const API_SETTINGS_STORAGE_KEY = "codex-image-api-settings";
-export const DEFAULT_DOCUMENT_TITLE = document.title || "iLab GPT CONJURE";
+export const DEFAULT_DOCUMENT_TITLE = document.title || "元枢在线生图";
 export const SUBMIT_TASK_TIMEOUT_MS = 45000;
 export const TASK_CARD_SELECTOR = ".task-card[data-task-id]";
 export const TASK_HISTORY_EXPANDED_GROUP_STORAGE_KEY = "codex-image-task-history-expanded-group";
