@@ -1643,7 +1643,7 @@ function reuseHistoryTask(taskId: string): void {
       source: "history",
       added_at: new Date().toISOString(),
     }));
-    window.location.href = "/";
+    window.location.href = yuanshuPath("/");
   } catch (error) {
     setText(els.resultSummary, errorMessage(error, translate("taskContext.actionFailed")));
   }
@@ -1915,7 +1915,7 @@ function positionHistoryContextMenu(menu: HTMLElement, clientX: number, clientY:
 function handoffReferenceToMain(url: string): void {
   if (!url) return;
   localStorage.setItem(HISTORY_REFERENCE_HANDOFF_KEY, JSON.stringify([{ url, source: "history", added_at: new Date().toISOString() }]));
-  window.location.href = "/";
+  window.location.href = yuanshuPath("/");
 }
 
 function openHistoryDetailLightbox(index: number): void {

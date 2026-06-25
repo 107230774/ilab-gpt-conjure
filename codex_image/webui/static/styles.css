@@ -11380,6 +11380,8 @@ html[data-yuanshu-mode="true"] #systemSettingsCodexPanel,
 html[data-yuanshu-mode="true"] .image-input-section,
 html[data-yuanshu-mode="true"] #recentAssetDock,
 html[data-yuanshu-mode="true"] #imageEditorModal,
+html[data-yuanshu-mode="true"] .model-tool-row,
+html[data-yuanshu-mode="true"] #mainModelField,
 html[data-yuanshu-mode="true"] #webSearchField,
 html[data-yuanshu-mode="true"] .api-status-bar {
   display: none !important;

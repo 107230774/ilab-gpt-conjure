@@ -7,6 +7,13 @@
     <link rel="icon" href="data:," />
     <script>
       (() => {
+        if (window.location.pathname.startsWith("/image-playground")) {
+          document.documentElement.dataset.yuanshuMode = "true";
+        }
+      })();
+    </script>
+    <script>
+      (() => {
         if (window.self === window.top) {
           window.location.replace("/image-playground-console");
         }

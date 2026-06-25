@@ -13704,7 +13704,7 @@
         source: "history",
         added_at: (/* @__PURE__ */ new Date()).toISOString()
       }));
-      window.location.href = "/";
+      window.location.href = yuanshuPath("/");
     } catch (error) {
       setText(els.resultSummary, errorMessage(error, translate("taskContext.actionFailed")));
     }
@@ -13951,7 +13951,7 @@
   function handoffReferenceToMain(url) {
     if (!url) return;
     localStorage.setItem(HISTORY_REFERENCE_HANDOFF_KEY, JSON.stringify([{ url, source: "history", added_at: (/* @__PURE__ */ new Date()).toISOString() }]));
-    window.location.href = "/";
+    window.location.href = yuanshuPath("/");
   }
   function openHistoryDetailLightbox(index) {
     const urls = historyLightboxUrlsFromTask(historyState.detailTask || {});
