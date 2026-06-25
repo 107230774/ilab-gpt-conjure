@@ -364,6 +364,21 @@ def create_app(
     def yuanshu_history() -> Response:
         return history()
 
+    @app.get("/sw.js", response_model=None)
+    def service_worker_cleanup() -> Response:
+        sw_path = static_path / "sw.js"
+        if sw_path.exists():
+            return FileResponse(
+                sw_path,
+                media_type="application/javascript",
+                headers={"Cache-Control": "no-store"},
+            )
+        return Response("", media_type="application/javascript", headers={"Cache-Control": "no-store"})
+
+    @app.get("/image-playground/sw.js", response_model=None)
+    def yuanshu_service_worker_cleanup() -> Response:
+        return service_worker_cleanup()
+
     @app.get("/outputs/{filename:path}", response_model=None)
     def output_file(filename: str, request: Request) -> Response:
         return _yuanshu_owned_output_file(ctx, filename, request)
