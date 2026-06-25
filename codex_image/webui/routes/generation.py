@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 
 from codex_image.client import DEFAULT_MAIN_MODEL, image_model_supports_input_fidelity
 from codex_image.webui.context import WebUIContext
@@ -19,8 +19,14 @@ from codex_image.webui.executor import (
 from codex_image.webui.prompt_ratio import append_ratio_prompt_instruction
 from codex_image.webui.storage import utc_now
 from codex_image.webui.task_metadata import _dedupe_preserve_order, _params, _with_file_urls, _write_queued_metadata
+from codex_image.webui.yuanshu_scope import current_yuanshu_session, stamp_current_yuanshu_owner
+from codex_image.webui.yuanshu import verify_yuanshu_token
 
 DEFAULT_PROMPT_FIDELITY = "strict"
+
+
+def _is_yuanshu_request(api_provider_id: str | None, api_mode: str | None) -> bool:
+    return str(api_provider_id or "").strip().lower() == "yuanshu" or str(api_mode or "").strip().lower() == "yuanshu"
 
 
 def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
@@ -28,6 +34,7 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
 
     @app.post("/api/generate")
     async def generate(
+        request: Request,
         prompt: str = Form(...),
         main_model: str = Form(DEFAULT_MAIN_MODEL),
         model: str = Form("gpt-image-2"),
@@ -51,11 +58,24 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
         reference_asset_ids: list[str] | None = Form(None),
         reference_images: list[UploadFile] | None = File(None),
     ) -> dict[str, Any]:
-        if not ctx.yuanshu.token and not ctx.auth_checker():
+        yuanshu_session = current_yuanshu_session(ctx, request)
+        if yuanshu_session is None and _is_yuanshu_request(api_provider_id, api_mode):
+            raise HTTPException(status_code=401, detail="Yuanshu image playground session is not ready")
+        if yuanshu_session is None and not ctx.auth_checker():
             raise HTTPException(status_code=401, detail="Codex auth is not available")
+        if yuanshu_session is not None:
+            try:
+                verify_yuanshu_token(
+                    str(yuanshu_session.get("token") or ""),
+                    server_api_base=str(yuanshu_session.get("server_api_base") or ctx.yuanshu.server_api_base),
+                )
+            except PermissionError as exc:
+                raise HTTPException(status_code=401, detail=str(exc)) from exc
+            except Exception as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
 
         gallery_refs, gallery_data_urls = _resolve_gallery_refs(ctx.gallery_storage, gallery_image_ids or [])
-        uploaded_assets = await h["save_reference_assets"](reference_images or [])
+        uploaded_assets = await h["save_reference_assets"](reference_images or [], request=request)
         selected_assets, _ = _resolve_reference_assets(ctx.reference_asset_storage, reference_asset_ids or [])
         reference_assets = h["dedupe_reference_assets"](uploaded_assets + selected_assets)
         task = ctx.storage.create_task("generate")
@@ -77,7 +97,7 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
         effective_codex_mode = h["request_codex_mode"](auth_source, codex_mode)
         effective_api_images_concurrency = h["request_api_images_concurrency"](auth_source, effective_api_provider_id)
         requested_backend = h["backend_for_submit"](auth_source, effective_api_mode, effective_codex_mode)
-        if ctx.yuanshu.token:
+        if yuanshu_session is not None:
             auth_source = "api"
             effective_api_provider_id = "yuanshu"
             effective_api_provider_name = "元枢"
@@ -170,6 +190,8 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
             requested_backend=requested_backend,
             max_attempts=ctx.queue_manager.max_attempts if ctx.queue_manager is not None else 1,
         )
+        metadata = stamp_current_yuanshu_owner(ctx, metadata, request)
+        ctx.storage.write_metadata(task.task_id, metadata)
         ctx.queue_storage.enqueue(task.task_id)
         h["ensure_queue_worker_running"]()
         return {
@@ -179,6 +201,7 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
 
     @app.post("/api/edit")
     async def edit(
+        request: Request,
         prompt: str = Form(...),
         main_model: str = Form(DEFAULT_MAIN_MODEL),
         model: str = Form("gpt-image-2"),
@@ -204,8 +227,21 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
         images: list[UploadFile] | None = File(None),
         mask: UploadFile | None = File(None),
     ) -> dict[str, Any]:
-        if not ctx.auth_checker():
+        yuanshu_session = current_yuanshu_session(ctx, request)
+        if yuanshu_session is None and _is_yuanshu_request(api_provider_id, api_mode):
+            raise HTTPException(status_code=401, detail="Yuanshu image playground session is not ready")
+        if yuanshu_session is None and not ctx.auth_checker():
             raise HTTPException(status_code=401, detail="Codex auth is not available")
+        if yuanshu_session is not None:
+            try:
+                verify_yuanshu_token(
+                    str(yuanshu_session.get("token") or ""),
+                    server_api_base=str(yuanshu_session.get("server_api_base") or ctx.yuanshu.server_api_base),
+                )
+            except PermissionError as exc:
+                raise HTTPException(status_code=401, detail=str(exc)) from exc
+            except Exception as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
 
         if not images and not _dedupe_preserve_order(gallery_image_ids or []) and not _dedupe_preserve_order(reference_asset_ids or []):
             raise HTTPException(status_code=400, detail="At least one image is required")

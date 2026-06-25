@@ -1,10 +1,34 @@
 import { getLegacyBridge } from "./state";
 import { updateModeSpecificSettings } from "./api-mode-settings";
 import { formatTranslation, translate } from "./i18n";
+import { getYuanshuSessionId, yuanshuPath } from "./yuanshu-paths";
 
 const bridge = getLegacyBridge();
 const state = bridge.state;
 const els = bridge.els;
+
+function isYuanshuMode(): boolean {
+  return document.documentElement.dataset.yuanshuMode === "true"
+    || window.location.pathname.startsWith("/image-playground");
+}
+
+function yuanshuAuthStatus(auth: any): any {
+  if (!isYuanshuMode()) return auth;
+  return {
+    ...(auth || {}),
+    selected_source: "api",
+    effective_source: "api",
+    auth_available: true,
+    sources: {
+      ...(auth?.sources || {}),
+      api: {
+        ...(auth?.sources?.api || {}),
+        available: true,
+        api_mode: "images",
+      },
+    },
+  };
+}
 
 function legacyMethod(name: string, ...args: any[]): any {
   const method = getLegacyBridge().methods[name];
@@ -24,10 +48,15 @@ function codexModeLabel(mode: any): string { return legacyMethod("codexModeLabel
 
 export async function refreshHealth(): Promise<void> {
   try {
-    const response = await fetch("/api/health");
+    const headers = new Headers();
+    const yuanshuSessionId = getYuanshuSessionId();
+    if (yuanshuSessionId) {
+      headers.set("X-Yuanshu-Session", yuanshuSessionId);
+    }
+    const response = await fetch(yuanshuPath("/api/health"), { headers });
     const data = await response.json();
-    state.authAvailable = Boolean(data.auth_available);
-    state.authStatus = data.auth || null;
+    state.authAvailable = isYuanshuMode() && yuanshuSessionId ? true : Boolean(data.auth_available);
+    state.authStatus = state.authAvailable ? yuanshuAuthStatus(data.auth || null) : (data.auth || null);
     renderAuthSource(state.authStatus);
     els.apiStatus.className = `status-dot ${state.authAvailable ? "ok" : "error"}`;
     els.runButton.disabled = !state.authAvailable;
@@ -48,9 +77,14 @@ export async function setAuthSource(source: any): Promise<void> {
   applyAuthSourceSelection(source);
   updateRequestPreview();
   try {
-    const response = await fetch("/api/auth", {
+    const headers = new Headers({ "Content-Type": "application/json" });
+    const yuanshuSessionId = getYuanshuSessionId();
+    if (yuanshuSessionId) {
+      headers.set("X-Yuanshu-Session", yuanshuSessionId);
+    }
+    const response = await fetch(yuanshuPath("/api/auth"), {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ source }),
     });
     const data = await response.json();
@@ -103,6 +137,9 @@ export function applyAuthSourceSelection(source: any): void {
 
 export function authSourceDetailText(auth: any): string {
   if (!auth) return translate("auth.checking");
+  if (isYuanshuMode() && (state.authAvailable || auth.auth_available)) {
+    return "元枢接口已连接";
+  }
   const selected = sourceLabel(auth.selected_source);
   const effectiveApi = auth.effective_source === "api";
   if (!auth.auth_available) {

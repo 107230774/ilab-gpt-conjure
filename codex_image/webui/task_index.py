@@ -71,6 +71,7 @@ SUMMARY_KEYS = {
     "requested_backend",
     "backend",
     "assigned_auth_source",
+    "yuanshu_owner",
 }
 
 TASK_INDEX_SCHEMA_VERSION = 4

@@ -13,7 +13,7 @@ export interface LegacyMethods {
   applyTaskUpdate(task: WebUITask | null | undefined): void;
   ensureSelectedTaskDetail(taskId?: string | null): Promise<WebUITask | null> | WebUITask | null;
   notifyTaskUpdate(previousTask: WebUITask | null | undefined, nextTask: WebUITask | null | undefined): void;
-  refreshTasks(options?: { migrateLegacyArchives?: boolean }): Promise<void>;
+  refreshTasks(options?: { migrateLegacyArchives?: boolean; preserveExistingOnEmpty?: boolean }): Promise<void>;
   updateDocumentTitle(): void;
   updateTaskInState(task: WebUITask | null | undefined): boolean;
   taskHasViewableUpdate(task: WebUITask | null | undefined): boolean;

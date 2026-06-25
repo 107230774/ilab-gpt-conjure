@@ -108,6 +108,15 @@ function renderImageStrip() {
       image.src = previewUrl;
     }
     image.alt = legacyMethod("sourceName", source);
+    image.addEventListener("error", () => {
+      const fallbackUrl = legacyMethod("sourcePreviewUrl", source);
+      if (fallbackUrl && image.src !== new URL(fallbackUrl, window.location.origin).href) {
+        image.src = fallbackUrl;
+        return;
+      }
+      image.alt = "";
+      wrapper.classList.add("missing-thumb");
+    }, { once: true });
     wrapper.title = source.missing
       ? (source.kind === "asset" ? translate("imageInput.deletedRecent") : translate("imageInput.deletedGallery"))
       : legacyMethod("sourceName", source);

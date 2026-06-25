@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
+
 from codex_image.client import DEFAULT_IMAGE_MODEL, OpenAIImagesImageClient
 
 
@@ -69,6 +71,28 @@ def _server_api_base() -> str:
     return YUANSHU_SERVER_API_BASE
 
 
+def yuanshu_session_verify_url(server_api_base: str | None = None) -> str:
+    raw = (server_api_base or _server_api_base()).rstrip("/")
+    return raw + "/session/verify"
+
+
+def verify_yuanshu_token(token: str, *, server_api_base: str | None = None) -> dict[str, Any]:
+    clean_token = str(token or "").strip()
+    if not clean_token:
+        raise RuntimeError("Yuanshu image playground token is required")
+    url = yuanshu_session_verify_url(server_api_base)
+    with httpx.Client(timeout=5.0) as client:
+        response = client.post(url, json={"token": clean_token})
+    data = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
+    if response.status_code == 401:
+        raise PermissionError(str(data.get("detail") or "Yuanshu image playground session expired"))
+    if response.status_code == 403:
+        raise PermissionError(str(data.get("detail") or "Yuanshu image playground key is unavailable"))
+    if response.status_code >= 400 or not data.get("ok"):
+        raise RuntimeError(str(data.get("detail") or "Yuanshu image playground session verification failed"))
+    return data
+
+
 def yuanshu_client(state: YuanshuBootstrapState) -> OpenAIImagesImageClient:
     if not state.token:
         raise RuntimeError("Yuanshu image playground session is not ready")
@@ -76,4 +100,17 @@ def yuanshu_client(state: YuanshuBootstrapState) -> OpenAIImagesImageClient:
         api_key=state.token,
         base_url=state.server_api_base,
         image_model=state.model,
+    )
+
+
+def yuanshu_client_from_session(session: dict[str, Any]) -> OpenAIImagesImageClient:
+    token = str(session.get("token") or "").strip()
+    if not token:
+        raise RuntimeError("Yuanshu image playground session is not ready")
+    base_url = str(session.get("server_api_base") or YUANSHU_SERVER_API_BASE).strip() or YUANSHU_SERVER_API_BASE
+    model = str(session.get("model") or DEFAULT_IMAGE_MODEL).strip() or DEFAULT_IMAGE_MODEL
+    return OpenAIImagesImageClient(
+        api_key=token,
+        base_url=base_url.rstrip("/"),
+        image_model=model,
     )

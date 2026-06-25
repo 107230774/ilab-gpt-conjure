@@ -1,5 +1,6 @@
 import { getLegacyBridge } from "./state";
 import { translate } from "./i18n";
+import { getYuanshuSessionId, hasYuanshuSession, yuanshuPath } from "./yuanshu-paths";
 
 const bridge = getLegacyBridge();
 const state = bridge.state;
@@ -14,6 +15,7 @@ function legacyMethod(name: string, ...args: any[]): any {
 }
 
 const SUBMIT_TASK_TIMEOUT_MS = 45000;
+const YUANSHU_SUBMIT_SETTLE_REFRESH_DELAYS_MS = [1000, 2500, 5000, 9000, 15000, 25000, 40000, 60000];
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message || fallback : fallback;
@@ -268,6 +270,15 @@ function addQueuedTask(task: any) {
   replacePendingTask(state.pendingTaskId || task.task_id, task);
 }
 
+function scheduleYuanshuSubmitSettleRefresh(): void {
+  YUANSHU_SUBMIT_SETTLE_REFRESH_DELAYS_MS.forEach((delay) => {
+    window.setTimeout(() => {
+      void window.refreshQueue?.();
+      void getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+    }, delay);
+  });
+}
+
 async function runTask() {
   syncPromptFromEditor();
   syncGalleryInputsFromPrompt();
@@ -329,6 +340,12 @@ async function runTask() {
   galleries.forEach((source: any) => form.append("gallery_image_ids", source.id));
   assets.forEach((source: any) => form.append("reference_asset_ids", source.id));
 
+  if (yuanshuMode && !hasYuanshuSession()) {
+    setStatus("元枢在线生图授权初始化中，请稍后再试。", "error");
+    window.parent?.postMessage({ type: "yuanshu:image-playground-ready" }, window.location.origin);
+    return;
+  }
+
   if (yuanshuMode || state.mode === "generate") {
     uploads.forEach((source: any) => form.append("reference_images", source.file));
   } else {
@@ -336,7 +353,9 @@ async function runTask() {
   }
 
   const pendingTask = createPendingTask();
-  addPendingTask(pendingTask);
+  if (!yuanshuMode) {
+    addPendingTask(pendingTask);
+  }
   if (els.requestJson) {
     els.requestJson.textContent = JSON.stringify(pendingTask.request, null, 2);
   }
@@ -346,9 +365,16 @@ async function runTask() {
   const controller = new AbortController();
   const submitTimeoutId = window.setTimeout(() => controller.abort(), SUBMIT_TASK_TIMEOUT_MS);
   try {
-    const response = await fetch(!yuanshuMode && state.mode === "edit" ? "/api/edit" : "/api/generate", {
+    const headers = new Headers();
+    const yuanshuSessionId = getYuanshuSessionId();
+    if (yuanshuMode && yuanshuSessionId) {
+      headers.set("X-Yuanshu-Session", yuanshuSessionId);
+    }
+    const endpoint = !yuanshuMode && state.mode === "edit" ? "/api/edit" : "/api/generate";
+    const response = await fetch(yuanshuPath(endpoint), {
       method: "POST",
       body: form,
+      headers,
       signal: controller.signal,
     });
     const data = await response.json();
@@ -356,12 +382,17 @@ async function runTask() {
       throw new Error(data.detail || translate("taskSubmit.requestFailed"));
     }
     addQueuedTask(data.task);
+    if (yuanshuMode) {
+      window.startRealtimeUpdates?.({ migrateLegacyArchives: false });
+      scheduleYuanshuSubmitSettleRefresh();
+    }
     if (els.requestJson) {
       els.requestJson.textContent = JSON.stringify(data.request || {}, null, 2);
     }
     stopRunFeedback();
     setStatus(translate("taskSubmit.queued"), "ok");
     await window.refreshQueue?.();
+    await getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
     await refreshRecentAssets();
     renderPreview(data.task);
   } catch (error) {
@@ -369,7 +400,11 @@ async function runTask() {
     const message = error instanceof DOMException && error.name === "AbortError"
       ? translate("taskSubmit.timeout")
       : errorMessage(error, translate("taskSubmit.failed"));
-    markPendingTaskFailed(pendingTask.task_id, message);
+    if (!yuanshuMode) {
+      markPendingTaskFailed(pendingTask.task_id, message);
+    } else if (message.includes("expired") || message.includes("authorization") || message.includes("auth") || message.includes("401")) {
+      window.parent?.postMessage({ type: "yuanshu:image-playground-session-expired" }, window.location.origin);
+    }
     setStatus(message, "error");
   } finally {
     window.clearTimeout(submitTimeoutId);

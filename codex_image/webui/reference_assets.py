@@ -68,6 +68,27 @@ class ReferenceAssetStorage:
             self._prune_to_limit()
             return touched
 
+    def set_owner(self, asset_id: str, owner: dict[str, Any] | None) -> dict[str, Any]:
+        with self._lock:
+            metadata = self.read_item(asset_id)
+            if owner:
+                owner_record = dict(owner)
+                metadata["yuanshu_owner"] = owner_record
+                owners = metadata.get("yuanshu_owners")
+                if not isinstance(owners, list):
+                    owners = []
+                owner_key = (str(owner_record.get("user_id") or ""), str(owner_record.get("key_id") or ""))
+                filtered = [
+                    item for item in owners
+                    if not (
+                        isinstance(item, dict)
+                        and (str(item.get("user_id") or ""), str(item.get("key_id") or "")) == owner_key
+                    )
+                ]
+                metadata["yuanshu_owners"] = [owner_record] + filtered
+            self._write_item_metadata(asset_id, metadata)
+            return metadata
+
     def list_recent(self, limit: int = 20) -> list[dict[str, Any]]:
         if not self.root.exists():
             return []

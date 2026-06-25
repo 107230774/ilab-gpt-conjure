@@ -1,4 +1,5 @@
 import { getLegacyBridge } from "./state";
+import { getYuanshuSessionId, yuanshuPath } from "./yuanshu-paths";
 
 const bridge = getLegacyBridge();
 const state = bridge.state;
@@ -25,14 +26,65 @@ const markTaskViewed = (...args: any[]) => legacyMethod("markTaskViewed", ...arg
 const ensureSelectedTaskDetail = (...args: any[]) => legacyMethod("ensureSelectedTaskDetail", ...args);
 const TASK_SEARCH_HISTORY_LIMIT = 100;
 const TASK_SEARCH_HISTORY_DEBOUNCE_MS = 180;
+const RECENTLY_FINISHED_PRESERVE_MS = 5 * 60 * 1000;
 let taskSearchHistoryTimerId = 0;
 
-async function refreshTasks({ migrateLegacyArchives = false }: any = {}) {
+function queuedOrRunningTaskIds(): Set<string> {
+  const queue = state.queue || {};
+  const waiting = Array.isArray(queue.waiting) ? queue.waiting : [];
+  const running = Array.isArray(queue.running) ? queue.running : [];
+  return new Set(
+    [...waiting, ...running]
+      .map((task: any) => String(task?.task_id || ""))
+      .filter(Boolean),
+  );
+}
+
+function noStoreUrl(path: string): string {
+  const separator = path.includes("?") ? "&" : "?";
+  return yuanshuPath(`${path}${separator}_=${Date.now()}`);
+}
+
+async function refreshTasks({ migrateLegacyArchives = false, preserveExistingOnEmpty = false }: any = {}) {
   const requestSeq = ++state.tasksRequestSeq;
-  const response = await fetch("/api/tasks/recent?limit=200");
+  const headers = new Headers();
+  const yuanshuSessionId = getYuanshuSessionId();
+  if (yuanshuSessionId) {
+    headers.set("X-Yuanshu-Session", yuanshuSessionId);
+    headers.set("Cache-Control", "no-cache");
+  }
+  const response = await fetch(noStoreUrl("/api/tasks/recent?limit=200"), {
+    cache: "no-store",
+    headers,
+  });
   const data = await response.json();
-  if (requestSeq !== state.tasksRequestSeq) return;
-  await applyTasksSnapshot(data.tasks || [], { migrateLegacyArchives, requestSeq });
+  const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+  const staleResponse = requestSeq !== state.tasksRequestSeq;
+  if (staleResponse && tasks.length === 0) return;
+  if (preserveExistingOnEmpty && tasks.length === 0 && state.tasks.some((task: any) => !task?.local_pending)) {
+    return;
+  }
+  await applyTasksSnapshot(preserveExistingOnEmpty ? mergePreservedVisibleTasks(tasks) : tasks, {
+    migrateLegacyArchives,
+    requestSeq: staleResponse ? state.tasksRequestSeq : requestSeq,
+  });
+}
+
+function mergePreservedVisibleTasks(tasks: any[]) {
+  const nextTasks = Array.isArray(tasks) ? tasks.slice() : [];
+  const nextIds = new Set(nextTasks.map((task: any) => String(task?.task_id || "")).filter(Boolean));
+  const queueTaskIds = queuedOrRunningTaskIds();
+  const preserved = state.tasks.filter((task: any) => {
+    const taskId = String(task?.task_id || "");
+    if (!taskId || nextIds.has(taskId) || task?.local_pending) return false;
+    const status = String(task?.status || "");
+    if (["submitting", "queued", "running"].includes(status)) return queueTaskIds.has(taskId);
+    if (!["completed", "failed", "partial_failed"].includes(status)) return false;
+    const timestamp = Date.parse(String(task.completed_at || task.updated_at || task.created_at || ""));
+    return Number.isFinite(timestamp) && Date.now() - timestamp < RECENTLY_FINISHED_PRESERVE_MS;
+  });
+  if (!preserved.length) return nextTasks;
+  return [...preserved, ...nextTasks];
 }
 
 async function applyTasksSnapshot(tasks: any, { migrateLegacyArchives = false, requestSeq = state.tasksRequestSeq }: any = {}) {

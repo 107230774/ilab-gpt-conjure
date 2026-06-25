@@ -1,7 +1,7 @@
 import { getLegacyBridge } from "./state";
 import { formatTranslation, LOCALE_CHANGE_EVENT, translate } from "./i18n";
 import type { TaskNotification, TaskNotificationSettings, TaskStatus, WebUITask } from "./types";
-import { yuanshuPath } from "./yuanshu-paths";
+import { currentYuanshuStorageScope, yuanshuPath } from "./yuanshu-paths";
 
 const TASK_NOTIFICATION_SETTINGS_KEY = "codex-image-task-notification-settings";
 const TASK_NOTIFICATION_SEEN_KEY = "codex-image-task-notification-seen";
@@ -26,6 +26,7 @@ export function initTaskNotificationsFeature(): void {
     openTaskNotificationCenter,
     renderTaskNotifications,
     requestSystemNotificationPermission,
+    refreshTaskNotificationScope,
   });
 }
 
@@ -202,6 +203,13 @@ function addTaskNotification(notification: TaskNotification): void {
 function clearTaskNotifications(): void {
   const state = getLegacyBridge().state;
   state.taskNotifications = [];
+  renderTaskNotifications();
+}
+
+function refreshTaskNotificationScope(): void {
+  const state = getLegacyBridge().state;
+  state.taskNotifications = [];
+  restoreTaskNotificationSeenKeys();
   renderTaskNotifications();
 }
 
@@ -463,7 +471,8 @@ function syncTaskNotificationSettingsInputs(): void {
 function restoreTaskNotificationSeenKeys(): void {
   const state = getLegacyBridge().state;
   try {
-    const stored = JSON.parse(localStorage.getItem(TASK_NOTIFICATION_SEEN_KEY) || "[]");
+    removeLegacyGlobalNotificationSeenKey();
+    const stored = JSON.parse(localStorage.getItem(scopedTaskNotificationSeenKey()) || "[]");
     state.taskNotificationSeenKeys = new Set(Array.isArray(stored) ? stored.filter((key) => typeof key === "string") : []);
   } catch {
     state.taskNotificationSeenKeys = new Set();
@@ -472,11 +481,21 @@ function restoreTaskNotificationSeenKeys(): void {
 
 function persistTaskNotificationSeenKeys(): void {
   try {
+    removeLegacyGlobalNotificationSeenKey();
     const keys = Array.from(getLegacyBridge().state.taskNotificationSeenKeys).slice(-MAX_SEEN_TASK_NOTIFICATION_KEYS);
-    localStorage.setItem(TASK_NOTIFICATION_SEEN_KEY, JSON.stringify(keys));
+    localStorage.setItem(scopedTaskNotificationSeenKey(), JSON.stringify(keys));
   } catch {
     // Notification delivery should not depend on storage availability.
   }
+}
+
+function removeLegacyGlobalNotificationSeenKey(): void {
+  if (scopedTaskNotificationSeenKey() === TASK_NOTIFICATION_SEEN_KEY) return;
+  localStorage.removeItem(TASK_NOTIFICATION_SEEN_KEY);
+}
+
+function scopedTaskNotificationSeenKey(): string {
+  return `${TASK_NOTIFICATION_SEEN_KEY}:${currentYuanshuStorageScope()}`;
 }
 
 function outputFileUrl(filename: string): string {

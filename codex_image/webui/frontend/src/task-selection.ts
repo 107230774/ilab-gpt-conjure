@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { formatTranslation, translate } from "./i18n";
 import { getLegacyBridge } from "./state";
+import { getYuanshuSessionId, yuanshuPath } from "./yuanshu-paths";
 
 const bridge = getLegacyBridge();
 const state = bridge.state;
@@ -89,7 +90,16 @@ function historyInputCandidateUrls(sourceUrl, fallbackUrl) {
 }
 
 async function loadFullTaskDetail(taskId) {
-  const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
+  const headers = new Headers();
+  const yuanshuSessionId = getYuanshuSessionId();
+  if (yuanshuSessionId) {
+    headers.set("X-Yuanshu-Session", yuanshuSessionId);
+    headers.set("Cache-Control", "no-cache");
+  }
+  const response = await fetch(yuanshuPath(`/api/tasks/${encodeURIComponent(taskId)}?_=${Date.now()}`), {
+    cache: "no-store",
+    headers,
+  });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.detail || translate("notifications.taskMissing"));
   return data.task;

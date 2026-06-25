@@ -437,6 +437,8 @@ def _sidebar_task_card(metadata: dict[str, Any]) -> dict[str, Any]:
         "input_thumbnail_urls": _sidebar_input_thumbnail_urls(metadata),
         "thumbnail_urls": [thumbnail_url] if thumbnail_url else [],
     }
+    if isinstance(metadata.get("yuanshu_owner"), dict):
+        card["yuanshu_owner"] = metadata["yuanshu_owner"]
     return {key: value for key, value in card.items() if value not in ("", [], {}) or key in {"task_id", "summary_only", "params"}}
 
 

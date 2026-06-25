@@ -1,4 +1,34 @@
 const YUANSHU_BASE_PATH = "/image-playground";
+let yuanshuSessionId = "";
+let yuanshuScopeId = "";
+let consecutiveUnavailableResponses = 0;
+
+export function setYuanshuSessionId(value: string): void {
+  yuanshuSessionId = String(value || "").trim();
+  const win = window as typeof window & { __yuanshuSessionId?: string };
+  win.__yuanshuSessionId = yuanshuSessionId;
+  document.documentElement.dataset.yuanshuSessionId = yuanshuSessionId;
+}
+
+export function hasYuanshuSession(): boolean {
+  return Boolean(getYuanshuSessionId());
+}
+
+export function getYuanshuSessionId(): string {
+  const win = window as typeof window & { __yuanshuSessionId?: string };
+  return yuanshuSessionId
+    || String(win.__yuanshuSessionId || "").trim()
+    || String(document.documentElement.dataset.yuanshuSessionId || "").trim();
+}
+
+export function setYuanshuScopeId(value: string): void {
+  yuanshuScopeId = String(value || "").trim();
+  document.documentElement.dataset.yuanshuScopeId = yuanshuScopeId;
+}
+
+export function currentYuanshuStorageScope(): string {
+  return yuanshuScopeId || "default";
+}
 
 function isExternalUrl(value: string): boolean {
   return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(value);
@@ -27,7 +57,27 @@ export function installYuanshuPathRuntime(): void {
   win.__yuanshuPathRuntimeInstalled = true;
 
   const originalFetch = window.fetch.bind(window);
-  window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => originalFetch(normalizeRequestInfo(input), init)) as typeof window.fetch;
+  window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const normalized = normalizeRequestInfo(input);
+    const headers = new Headers(init?.headers || (normalized instanceof Request ? normalized.headers : undefined));
+    if (yuanshuSessionId) {
+      headers.set("X-Yuanshu-Session", yuanshuSessionId);
+    }
+    const response = await originalFetch(normalized, { ...(init || {}), headers });
+    if (response.status === 401 || response.status === 403) {
+      window.parent?.postMessage({ type: "yuanshu:image-playground-session-expired" }, window.location.origin);
+    }
+    if ([502, 503, 504].includes(response.status)) {
+      consecutiveUnavailableResponses += 1;
+      if (consecutiveUnavailableResponses >= 3) {
+        (window as any).closeRealtimeUpdates?.();
+        window.parent?.postMessage({ type: "yuanshu:image-playground-unavailable" }, window.location.origin);
+      }
+    } else if (response.status < 500) {
+      consecutiveUnavailableResponses = 0;
+    }
+    return response;
+  }) as typeof window.fetch;
 
   const NativeEventSource = window.EventSource;
   if (NativeEventSource) {
@@ -39,4 +89,3 @@ export function installYuanshuPathRuntime(): void {
     } as typeof EventSource;
   }
 }
-

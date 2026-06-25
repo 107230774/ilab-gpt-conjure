@@ -11681,6 +11681,8 @@
 
   // codex_image/webui/frontend/src/yuanshu-paths.ts
   var YUANSHU_BASE_PATH = "/image-playground";
+  var yuanshuSessionId = "";
+  var consecutiveUnavailableResponses = 0;
   function isExternalUrl(value) {
     return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(value);
   }
@@ -11704,7 +11706,27 @@
     if (win.__yuanshuPathRuntimeInstalled) return;
     win.__yuanshuPathRuntimeInstalled = true;
     const originalFetch = window.fetch.bind(window);
-    window.fetch = ((input, init) => originalFetch(normalizeRequestInfo(input), init));
+    window.fetch = (async (input, init) => {
+      const normalized = normalizeRequestInfo(input);
+      const headers = new Headers(init?.headers || (normalized instanceof Request ? normalized.headers : void 0));
+      if (yuanshuSessionId) {
+        headers.set("X-Yuanshu-Session", yuanshuSessionId);
+      }
+      const response = await originalFetch(normalized, { ...init || {}, headers });
+      if (response.status === 401 || response.status === 403) {
+        window.parent?.postMessage({ type: "yuanshu:image-playground-session-expired" }, window.location.origin);
+      }
+      if ([502, 503, 504].includes(response.status)) {
+        consecutiveUnavailableResponses += 1;
+        if (consecutiveUnavailableResponses >= 3) {
+          window.closeRealtimeUpdates?.();
+          window.parent?.postMessage({ type: "yuanshu:image-playground-unavailable" }, window.location.origin);
+        }
+      } else if (response.status < 500) {
+        consecutiveUnavailableResponses = 0;
+      }
+      return response;
+    });
     const NativeEventSource = window.EventSource;
     if (NativeEventSource) {
       window.EventSource = class YuanshuEventSource extends NativeEventSource {

@@ -71,6 +71,9 @@ function taskPreviewStatus(task: any) {
   const taskId = String(task?.task_id || "");
   if (queueContainsTask(state.queue.running, taskId)) return "running";
   if (queueContainsTask(state.queue.waiting, taskId)) return status === "submitting" ? "submitting" : "queued";
+  if (["running", "queued", "submitting"].includes(status) && !task?.local_pending) {
+    return taskOutputUrls(task).length ? "completed" : "";
+  }
   return status;
 }
 

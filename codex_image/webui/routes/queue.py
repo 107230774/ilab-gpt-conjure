@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from codex_image.webui.context import WebUIContext
 from codex_image.webui.events import event_key, event_snapshot, queue_snapshot, queued_or_running_task_ids, sse_message, task_event
+from codex_image.webui.yuanshu_scope import require_current_yuanshu_task
 
 EVENT_STREAM_CHECK_INTERVAL_SECONDS = 1.0
 
@@ -16,9 +17,9 @@ def register_queue_routes(app: FastAPI, ctx: WebUIContext) -> None:
     h = ctx.route_helpers
 
     @app.get("/api/queue")
-    async def get_queue() -> dict[str, Any]:
+    async def get_queue(request: Request) -> dict[str, Any]:
         h["ensure_queue_worker_running"]()
-        return queue_snapshot(ctx)
+        return queue_snapshot(ctx, request)
 
     @app.get("/api/events", response_model=None)
     async def events(request: Request, stream: bool = False) -> StreamingResponse:
@@ -27,7 +28,7 @@ def register_queue_routes(app: FastAPI, ctx: WebUIContext) -> None:
 
         async def stream_events():
             h["ensure_queue_worker_running"]()
-            snapshot = event_snapshot(ctx)
+            snapshot = event_snapshot(ctx, request)
             yield sse_message(snapshot)
             if not should_stream:
                 return
@@ -40,7 +41,7 @@ def register_queue_routes(app: FastAPI, ctx: WebUIContext) -> None:
                 if await request.is_disconnected():
                     return
                 h["ensure_queue_worker_running"]()
-                queue = queue_snapshot(ctx)
+                queue = queue_snapshot(ctx, request)
                 queue_key = event_key(queue)
                 if queue_key == previous_queue_key:
                     continue
@@ -48,7 +49,7 @@ def register_queue_routes(app: FastAPI, ctx: WebUIContext) -> None:
                 yield sse_message({"type": "queue", "queue": queue})
                 current_task_ids = queued_or_running_task_ids(queue)
                 for task_id in sorted(previous_task_ids - current_task_ids):
-                    task_payload = task_event(ctx, task_id)
+                    task_payload = task_event(ctx, task_id, request)
                     if task_payload is not None:
                         yield sse_message(task_payload)
                 previous_queue_key = queue_key
@@ -57,24 +58,28 @@ def register_queue_routes(app: FastAPI, ctx: WebUIContext) -> None:
         return StreamingResponse(stream_events(), media_type="text/event-stream")
 
     @app.patch("/api/queue/reorder")
-    def reorder_queue(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    def reorder_queue(request: Request, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
         task_ids = [str(item) for item in payload.get("task_ids", [])]
+        for task_id in task_ids:
+            require_current_yuanshu_task(ctx, task_id, request)
         try:
             ctx.queue_storage.reorder(task_ids)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return queue_snapshot(ctx)
+        return queue_snapshot(ctx, request)
 
     @app.post("/api/queue/{task_id}/promote")
-    def promote_queue_task(task_id: str) -> dict[str, Any]:
+    def promote_queue_task(task_id: str, request: Request) -> dict[str, Any]:
+        require_current_yuanshu_task(ctx, task_id, request)
         try:
             ctx.queue_storage.promote(task_id)
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        return queue_snapshot(ctx)
+        return queue_snapshot(ctx, request)
 
     @app.delete("/api/queue/{task_id}")
-    async def delete_queue_task(task_id: str) -> dict[str, Any]:
+    async def delete_queue_task(task_id: str, request: Request) -> dict[str, Any]:
+        require_current_yuanshu_task(ctx, task_id, request)
         state = ctx.queue_storage.read_state()
         if task_id in state["waiting"]:
             ctx.queue_storage.remove_waiting(task_id)

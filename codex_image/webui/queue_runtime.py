@@ -28,7 +28,8 @@ from .executor import (
 )
 from .queue import NonRetryableTaskError, QueueChannel, QueueManager
 from .storage import utc_now
-from .yuanshu import yuanshu_client
+from .yuanshu import yuanshu_client, yuanshu_client_from_session
+from .yuanshu_scope import YUANSHU_SESSION_REF_KEY
 
 
 @dataclass(frozen=True)
@@ -106,6 +107,17 @@ def _queue_channel_available(ctx: WebUIContext, channel: QueueChannel) -> bool:
 
 
 def _client_for_queue_channel(ctx: WebUIContext, channel: QueueChannel, metadata: dict[str, Any] | None = None, *, client_factory_overridden: bool = False) -> Any:
+    yuanshu_session = None
+    if isinstance(metadata, dict):
+        session_ref = metadata.get(YUANSHU_SESSION_REF_KEY)
+        if isinstance(session_ref, dict):
+            session_id = str(session_ref.get("session_id") or "").strip()
+            if session_id:
+                yuanshu_session = ctx.yuanshu_sessions.get(session_id)
+    if isinstance(yuanshu_session, dict) and yuanshu_session.get("token"):
+        return yuanshu_client_from_session(yuanshu_session)
+    if isinstance(metadata, dict) and metadata.get(YUANSHU_SESSION_REF_KEY):
+        raise RuntimeError("Yuanshu image playground authorization expired; please submit the task again")
     if ctx.yuanshu.token:
         return yuanshu_client(ctx.yuanshu)
     if client_factory_overridden:

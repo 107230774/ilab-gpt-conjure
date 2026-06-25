@@ -2,9 +2,15 @@ import { getEls } from "./dom";
 import { formatTranslation, LOCALE_CHANGE_EVENT, translate } from "./i18n";
 import { getLegacyBridge, getState } from "./state";
 import type { QueueState, RealtimePayload, WebUITask } from "./types";
+import { getYuanshuSessionId, yuanshuPath } from "./yuanshu-paths";
 
 const REALTIME_EVENTS_URL = "/api/events?stream=1";
 const QUEUE_DISPATCH_RESYNC_DELAY_MS = 1500;
+const YUANSHU_QUEUE_POLL_INTERVAL_MS = 5000;
+const YUANSHU_COMPLETION_REFRESH_DELAYS_MS = [0, 500, 1500, 3000];
+const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "partial_failed"]);
+const YUANSHU_TASK_DETAIL_REFRESH_DELAYS_MS = [0, 700, 1800, 3500];
+const ACTIVE_TASK_STATUSES = new Set(["submitting", "queued", "running"]);
 
 type QueueTask = WebUITask & {
   output_size?: string;
@@ -18,6 +24,24 @@ type QueueTask = WebUITask & {
 };
 
 let queueFeatureInitialized = false;
+let yuanshuQueuePollTimerId: number | null = null;
+let yuanshuCompletionRefreshTimerIds: number[] = [];
+let yuanshuTaskDetailRefreshTimerIds: number[] = [];
+
+function yuanshuSessionHeaders(): Headers {
+  const headers = new Headers();
+  const yuanshuSessionId = getYuanshuSessionId();
+  if (yuanshuSessionId) {
+    headers.set("X-Yuanshu-Session", yuanshuSessionId);
+    headers.set("Cache-Control", "no-cache");
+  }
+  return headers;
+}
+
+function noStoreUrl(path: string): string {
+  const separator = path.includes("?") ? "&" : "?";
+  return yuanshuPath(`${path}${separator}_=${Date.now()}`);
+}
 
 export function initializeQueueFeature(): void {
   if (queueFeatureInitialized) return;
@@ -44,6 +68,11 @@ function bindQueueControls(): void {
 export function startRealtimeUpdates({ migrateLegacyArchives = false } = {}): boolean {
   const state = getState();
   if (!window.EventSource) return false;
+  if (isYuanshuEmbeddedMode()) {
+    closeRealtimeUpdates();
+    startYuanshuQueuePolling({ migrateLegacyArchives });
+    return false;
+  }
   closeRealtimeUpdates();
   state.realtimeSnapshotNeedsArchiveMigration = migrateLegacyArchives;
   const source = new EventSource(REALTIME_EVENTS_URL);
@@ -60,7 +89,7 @@ export function startRealtimeUpdates({ migrateLegacyArchives = false } = {}): bo
     closeRealtimeUpdates();
     state.realtimeSnapshotNeedsArchiveMigration = false;
     void refreshQueue();
-    void getLegacyBridge().methods.refreshTasks({ migrateLegacyArchives: shouldMigrateArchives });
+    void getLegacyBridge().methods.refreshTasks({ migrateLegacyArchives: shouldMigrateArchives, preserveExistingOnEmpty: true });
     getLegacyBridge().methods.setStatus(translate("queue.realtimeDisconnected"), "error");
   };
   return true;
@@ -68,9 +97,97 @@ export function startRealtimeUpdates({ migrateLegacyArchives = false } = {}): bo
 
 export function closeRealtimeUpdates(): void {
   const state = getState();
+  stopYuanshuQueuePolling();
   if (!state.realtimeSource) return;
   state.realtimeSource.close();
   state.realtimeSource = null;
+}
+
+function isYuanshuEmbeddedMode(): boolean {
+  return window.location.pathname.startsWith("/image-playground");
+}
+
+function startYuanshuQueuePolling({ migrateLegacyArchives = false } = {}): void {
+  const pollOnce = (shouldMigrateArchives = false) => {
+    void refreshQueue();
+    void getLegacyBridge().methods.refreshTasks?.({
+      migrateLegacyArchives: shouldMigrateArchives,
+      preserveExistingOnEmpty: true,
+    });
+  };
+  if (yuanshuQueuePollTimerId !== null) {
+    pollOnce(migrateLegacyArchives);
+    return;
+  }
+  let shouldMigrateArchives = migrateLegacyArchives;
+  const poll = () => {
+    pollOnce(shouldMigrateArchives);
+    shouldMigrateArchives = false;
+  };
+  yuanshuQueuePollTimerId = window.setInterval(poll, YUANSHU_QUEUE_POLL_INTERVAL_MS);
+  window.addEventListener("pagehide", stopYuanshuQueuePolling, { once: true });
+  document.addEventListener("visibilitychange", poll);
+  poll();
+}
+
+function stopYuanshuQueuePolling(): void {
+  if (yuanshuQueuePollTimerId === null) return;
+  window.clearInterval(yuanshuQueuePollTimerId);
+  yuanshuQueuePollTimerId = null;
+}
+
+function scheduleYuanshuCompletionRefreshBurst(): void {
+  if (!isYuanshuEmbeddedMode()) {
+    void getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+    return;
+  }
+  yuanshuCompletionRefreshTimerIds.forEach((timerId) => window.clearTimeout(timerId));
+  yuanshuCompletionRefreshTimerIds = YUANSHU_COMPLETION_REFRESH_DELAYS_MS.map((delay) => window.setTimeout(() => {
+    void getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+  }, delay));
+}
+
+async function refreshCompletedQueueSnapshot(): Promise<void> {
+  const bridge = getLegacyBridge();
+  bridge.state.tasksRenderKey = null;
+  await bridge.methods.refreshTasks?.({ preserveExistingOnEmpty: false });
+  bridge.methods.renderTasks?.();
+  bridge.methods.renderPreview?.();
+}
+
+function scheduleYuanshuTaskDetailRefreshBurst(taskIds: Iterable<string>): void {
+  const ids = [...new Set([...taskIds].map(String).filter(Boolean))];
+  if (!ids.length) return;
+  if (!isYuanshuEmbeddedMode()) {
+    ids.forEach((taskId) => void refreshTaskDetailIntoSidebar(taskId));
+    return;
+  }
+  yuanshuTaskDetailRefreshTimerIds.forEach((timerId) => window.clearTimeout(timerId));
+  yuanshuTaskDetailRefreshTimerIds = [];
+  ids.forEach((taskId) => {
+    YUANSHU_TASK_DETAIL_REFRESH_DELAYS_MS.forEach((delay) => {
+      const timerId = window.setTimeout(() => {
+        void refreshTaskDetailIntoSidebar(taskId);
+      }, delay);
+      yuanshuTaskDetailRefreshTimerIds.push(timerId);
+    });
+  });
+}
+
+async function refreshTaskDetailIntoSidebar(taskId: string): Promise<void> {
+  const bridge = getLegacyBridge();
+  try {
+    const response = await fetch(noStoreUrl(`/api/tasks/${encodeURIComponent(taskId)}`), {
+      cache: "no-store",
+      headers: yuanshuSessionHeaders(),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.task) return;
+    bridge.methods.applyTaskUpdate?.(data.task);
+    await bridge.methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+  } catch (error) {
+    console.warn(error);
+  }
 }
 
 export async function handleRealtimeMessage(event: MessageEvent): Promise<void> {
@@ -100,6 +217,12 @@ export async function handleRealtimePayload(payload: RealtimePayload | null | un
     const previousTask = state.tasks.find((item) => String(item.task_id) === String(payload.task?.task_id));
     bridge.methods.notifyTaskUpdate?.(previousTask, payload.task);
     bridge.methods.applyTaskUpdate(payload.task);
+    if (TERMINAL_TASK_STATUSES.has(String(payload.task?.status || ""))) {
+      scheduleYuanshuCompletionRefreshBurst();
+      if (payload.task?.task_id) {
+        scheduleYuanshuTaskDetailRefreshBurst([String(payload.task.task_id)]);
+      }
+    }
   }
 }
 
@@ -107,15 +230,21 @@ export async function refreshQueue(): Promise<void> {
   const bridge = getLegacyBridge();
   const state = bridge.state;
   const requestSeq = ++state.queueRequestSeq;
+  const previousActiveTaskIds = currentActiveTaskIds();
   try {
-    const response = await fetch("/api/queue");
+    const response = await fetch(noStoreUrl("/api/queue"), {
+      cache: "no-store",
+      headers: yuanshuSessionHeaders(),
+    });
     const data = await response.json();
     if (requestSeq !== state.queueRequestSeq) return;
     if (!response.ok) {
       throw new Error(data.detail || translate("queue.readFailed"));
     }
-    state.queue = normalizeQueueState(data);
+    const queue = normalizeQueueState(data);
+    state.queue = queue;
     renderQueue();
+    applyQueueTasks(queue, { previousActiveTaskIds });
   } catch (error: unknown) {
     bridge.methods.setStatus(errorMessage(error, translate("queue.readFailed")), "error");
   }
@@ -476,7 +605,10 @@ export function handleQueueDragEnd(_event: DragEvent): void {
   getState().queueDragTaskId = null;
 }
 
-export function applyQueueTasks(queue: QueueState | null | undefined): void {
+export function applyQueueTasks(
+  queue: QueueState | null | undefined,
+  { previousActiveTaskIds = currentActiveTaskIds() }: { previousActiveTaskIds?: Set<string> } = {},
+): void {
   const bridge = getLegacyBridge();
   const tasks = [
     ...(Array.isArray(queue?.waiting) ? queue.waiting : []),
@@ -484,24 +616,36 @@ export function applyQueueTasks(queue: QueueState | null | undefined): void {
   ];
   const queueTaskIds = new Set(tasks.map((task) => String(task.task_id)));
   const needsTaskReconcile = activeTasksNeedQueueReconcile(queueTaskIds);
+  const completedActiveTaskMissingFromQueue = activeTasksMissingFromQueue(previousActiveTaskIds, queueTaskIds);
+  const missingActiveTaskIds = activeTaskIdsMissingFromQueue(previousActiveTaskIds, queueTaskIds);
   if (!tasks.length) {
-    if (needsTaskReconcile) {
-      void bridge.methods.refreshTasks();
+    if (needsTaskReconcile || completedActiveTaskMissingFromQueue) {
+      scheduleYuanshuCompletionRefreshBurst();
+      scheduleYuanshuTaskDetailRefreshBurst(missingActiveTaskIds);
+      void refreshCompletedQueueSnapshot();
+    } else if (bridge.els.taskActiveList && !bridge.els.taskActiveList.classList.contains("hidden")) {
+      bridge.state.tasksRenderKey = null;
+      bridge.methods.renderTasks?.();
     }
     return;
   }
   let changed = false;
+  let terminalTransition = false;
   tasks.forEach((task) => {
     const previousTask = bridge.state.tasks.find((item) => String(item.task_id) === String(task.task_id));
     bridge.methods.notifyTaskUpdate?.(previousTask, task);
     changed = bridge.methods.updateTaskInState(task) || changed;
+    if (isTerminalTaskTransition(previousTask, task)) {
+      terminalTransition = true;
+    }
     if (String(task.task_id) === String(bridge.state.selectedTaskId) && bridge.methods.taskHasViewableUpdate(task)) {
       void bridge.methods.markTaskViewed(task.task_id);
     }
   });
   if (!changed) {
-    if (needsTaskReconcile) {
-      void bridge.methods.refreshTasks();
+    if (needsTaskReconcile || completedActiveTaskMissingFromQueue) {
+      scheduleYuanshuCompletionRefreshBurst();
+      scheduleYuanshuTaskDetailRefreshBurst(missingActiveTaskIds);
     }
     return;
   }
@@ -510,9 +654,25 @@ export function applyQueueTasks(queue: QueueState | null | undefined): void {
   bridge.methods.renderArchiveButton();
   bridge.methods.renderArchiveModal();
   bridge.methods.renderPreview();
-  if (needsTaskReconcile) {
-    void bridge.methods.refreshTasks();
+  if (needsTaskReconcile || completedActiveTaskMissingFromQueue) {
+    scheduleYuanshuCompletionRefreshBurst();
+    scheduleYuanshuTaskDetailRefreshBurst(missingActiveTaskIds);
   }
+  if (terminalTransition) {
+    scheduleYuanshuCompletionRefreshBurst();
+    scheduleYuanshuTaskDetailRefreshBurst(tasks
+      .filter((task) => TERMINAL_TASK_STATUSES.has(String(task?.status || "")))
+      .map((task) => String(task.task_id || "")));
+  }
+}
+
+function isTerminalTaskTransition(previousTask: WebUITask | null | undefined, nextTask: WebUITask | null | undefined): boolean {
+  const taskId = String(nextTask?.task_id || "");
+  if (!taskId) return false;
+  const nextStatus = String(nextTask?.status || "");
+  if (!TERMINAL_TASK_STATUSES.has(nextStatus)) return false;
+  const previousStatus = String(previousTask?.status || "");
+  return !TERMINAL_TASK_STATUSES.has(previousStatus);
 }
 
 function activeTasksNeedQueueReconcile(queueTaskIds: Set<string>): boolean {
@@ -521,8 +681,34 @@ function activeTasksNeedQueueReconcile(queueTaskIds: Set<string>): boolean {
     const taskId = String(task?.task_id || "");
     if (!taskId || queueTaskIds.has(taskId) || task?.local_pending) return false;
     const status = String(task?.status || "");
-    return status === "submitting" || status === "queued" || status === "running";
+    return ACTIVE_TASK_STATUSES.has(status);
   });
+}
+
+function currentActiveTaskIds(): Set<string> {
+  const bridge = getLegacyBridge();
+  return new Set(
+    bridge.state.tasks
+      .filter((task) => {
+        if (task?.local_pending) return false;
+        const status = String(task?.status || "");
+        return ACTIVE_TASK_STATUSES.has(status);
+      })
+      .map((task) => String(task.task_id || ""))
+      .filter(Boolean),
+  );
+}
+
+function activeTasksMissingFromQueue(previousActiveTaskIds: Set<string>, queueTaskIds: Set<string>): boolean {
+  return activeTaskIdsMissingFromQueue(previousActiveTaskIds, queueTaskIds).size > 0;
+}
+
+function activeTaskIdsMissingFromQueue(previousActiveTaskIds: Set<string>, queueTaskIds: Set<string>): Set<string> {
+  const missing = new Set<string>();
+  for (const taskId of previousActiveTaskIds) {
+    if (!queueTaskIds.has(taskId)) missing.add(taskId);
+  }
+  return missing;
 }
 
 export function updateQueueElapsedDisplays(): void {

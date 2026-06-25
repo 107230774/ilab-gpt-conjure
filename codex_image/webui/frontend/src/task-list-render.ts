@@ -75,6 +75,11 @@ function renderTasks(options: { preserveScroll?: boolean } = {}) {
   const layout = taskAnchorLayout(groups, expandedGroup?.key || null, query);
   const nextRenderKey = taskListRenderKey(tasks, query, layout, filters, activeGroup);
   if (state.tasksRenderKey === nextRenderKey) {
+    const expandedKey = layout.expandedKey || layout.expandedGroup?.key || "";
+    const expandedBody = expandedKey ? expandedTaskGroupItemsContainer(String(expandedKey)) : null;
+    if (layout.expandedGroup && expandedBody && !expandedBody.dataset.renderComplete && !expandedBody.querySelector(".task-card")) {
+      scheduleExpandedTaskGroupItemsRender(layout.expandedGroup, expandedKey);
+    }
     updateTaskElapsedDisplays();
     restoreTaskListScrollAnchor(scrollAnchor);
     return;
@@ -293,7 +298,7 @@ function scheduleExpandedTaskGroupItemsRender(group: any, activeGroupKey: string
       body.dataset.renderComplete = "true";
     }
   };
-  requestAnimationFrame(renderChunk);
+  renderChunk();
 }
 
 function taskCardRoot() {
@@ -435,9 +440,9 @@ function activeTaskSections(tasks: any[]) {
   tasks.forEach((task: any) => {
     const taskId = String(task?.task_id || "");
     const status = String(task?.status || "");
-    if (queueIds.running.has(taskId) || status === "running") {
+    if (queueIds.running.has(taskId)) {
       running.push(task);
-    } else if (queueIds.waiting.has(taskId) || task?.local_pending || ["submitting", "queued"].includes(status)) {
+    } else if (queueIds.waiting.has(taskId) || task?.local_pending || (status === "submitting" && !taskId.startsWith("pending-"))) {
       waiting.push(task);
     }
   });
@@ -811,8 +816,15 @@ function historyLibraryGroup(tasks: any[], query: string) {
 }
 
 function isAlwaysVisibleTask(task: any) {
+  const taskId = String(task?.task_id || "");
   const status = String(task?.status || "");
-  return Boolean(task?.local_pending || ["submitting", "queued", "running"].includes(status));
+  const queueIds = queueTaskIdsBySection();
+  return Boolean(
+    task?.local_pending
+    || queueIds.running.has(taskId)
+    || queueIds.waiting.has(taskId)
+    || (status === "submitting" && !taskId.startsWith("pending-")),
+  );
 }
 
 function queueTaskIdsBySection() {
@@ -831,10 +843,8 @@ function queueTaskIdsBySection() {
 function activeTaskOrderIndex(task: any, sectionIds = queueTaskIdsBySection()) {
   const taskId = String(task?.task_id || "");
   if (sectionIds.running.has(taskId)) return sectionIds.running.get(taskId) || 0;
-  if (String(task?.status || "") === "running") return 1000;
   if (sectionIds.waiting.has(taskId)) return 2000 + (sectionIds.waiting.get(taskId) || 0);
   if (task?.local_pending || String(task?.status || "") === "submitting") return 3000;
-  if (String(task?.status || "") === "queued") return 4000;
   return 5000;
 }
 

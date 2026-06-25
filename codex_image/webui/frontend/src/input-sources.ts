@@ -1,6 +1,7 @@
 import { getEls } from "./dom";
 import { formatTranslation, LOCALE_CHANGE_EVENT, translate } from "./i18n";
 import { getLegacyBridge, getState } from "./state";
+import { yuanshuPath } from "./yuanshu-paths";
 
 let inputSourcesFeatureInitialized = false;
 const HISTORY_REFERENCE_HANDOFF_KEY = "codex-image-history-reference-handoff";
@@ -28,6 +29,13 @@ function uploadSource(file: File) {
   };
 }
 
+function referenceAssetImageUrl(item: any): string {
+  const explicitUrl = item?.image_url || item?.previewUrl || item?.preview_url || item?.thumbnail_url || "";
+  if (explicitUrl) return yuanshuPath(explicitUrl);
+  const id = String(item?.id || "").trim();
+  return id ? yuanshuPath(`/api/reference-assets/${encodeURIComponent(id)}/image`) : "";
+}
+
 function isImageFile(file: any) {
   if (!file) return false;
   if (String(file.type || "").startsWith("image/")) return true;
@@ -35,6 +43,7 @@ function isImageFile(file: any) {
 }
 
 function gallerySource(item: any) {
+  const imageUrl = yuanshuPath(item.image_url || "");
   return {
     kind: "gallery",
     id: item.id,
@@ -43,29 +52,31 @@ function gallerySource(item: any) {
     category_name: item.category_name || legacyMethod("categoryLabel", item.category),
     category_prompt_role: item.category_prompt_role || legacyMethod("categoryPromptRole", item.category),
     prompt_note: item.prompt_note || "",
-    image_url: item.image_url || "",
-    previewUrl: item.image_url || "",
+    image_url: imageUrl,
+    previewUrl: imageUrl,
     missing: Boolean(item.missing),
   };
 }
 
 function assetSource(item: any) {
+  const imageUrl = referenceAssetImageUrl(item);
   return {
     kind: "asset",
     id: item.id,
     name: item.name || item.filename || "",
     filename: item.filename || "",
     mime_type: item.mime_type || "",
-    image_url: item.image_url || "",
-    previewUrl: item.image_url || "",
+    image_url: imageUrl,
+    previewUrl: imageUrl,
     missing: Boolean(item.missing),
   };
 }
 
 function sourcePreviewUrl(source: any) {
   if (!source) return "";
-  if (source.kind === "upload") return source.previewUrl;
-  return source.image_url || source.previewUrl || "";
+  if (source.kind === "upload") return source.previewUrl || yuanshuPath(source.image_url || source.preview_url || "");
+  if (source.kind === "asset") return referenceAssetImageUrl(source);
+  return yuanshuPath(source.image_url || source.previewUrl || source.preview_url || source.thumbnail_url || "");
 }
 
 function sourceListUsesPreviewUrl(sources: any, previewUrl: string, ignoredSources = new Set()) {

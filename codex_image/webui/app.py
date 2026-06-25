@@ -166,6 +166,7 @@ from .task_metadata import (
     _write_queued_metadata,
     _write_running_metadata,
 )
+from .yuanshu_scope import current_yuanshu_owner_for_request, metadata_matches_current_yuanshu_owner
 
 ClientFactory = Callable[[], Any]
 AuthChecker = Callable[[], bool]
@@ -238,6 +239,24 @@ def create_app(
     check_auth = auth_checker or (lambda: bool(_auth_status(auth_settings.read_source(), api_settings=api_settings)["auth_available"]))
 
     app = FastAPI(title="元枢在线生图", lifespan=queue_lifespan)
+
+    @app.middleware("http")
+    async def no_store_yuanshu_dynamic_responses(request: Request, call_next: Callable[[Request], Any]) -> Response:
+        response = await call_next(request)
+        path = request.url.path
+        if (
+            path == "/"
+            or path == "/history"
+            or path == "/image-playground/"
+            or path == "/image-playground/history"
+            or path.startswith("/api/")
+            or path.startswith("/image-playground/api/")
+        ):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
     ctx = WebUIContext(
         app=app,
         storage=storage,
@@ -268,10 +287,7 @@ def create_app(
         client_factory_overridden=client_factory is not None,
     )
     app.mount("/inputs", StaticFiles(directory=input_path, check_dir=False), name="inputs")
-    app.mount("/outputs", StaticFiles(directory=output_path, check_dir=False), name="outputs")
     app.mount("/static", NoCacheStaticFiles(directory=static_path, check_dir=False), name="static")
-    app.mount("/image-playground/inputs", StaticFiles(directory=input_path, check_dir=False), name="yuanshu-inputs")
-    app.mount("/image-playground/outputs", StaticFiles(directory=output_path, check_dir=False), name="yuanshu-outputs")
     app.mount("/image-playground/static", NoCacheStaticFiles(directory=static_path, check_dir=False), name="yuanshu-static")
 
     @app.get("/", response_model=None)
@@ -302,6 +318,14 @@ def create_app(
     def yuanshu_history() -> Response:
         return history()
 
+    @app.get("/outputs/{filename:path}", response_model=None)
+    def output_file(filename: str, request: Request) -> Response:
+        return _yuanshu_owned_output_file(ctx, filename, request)
+
+    @app.get("/image-playground/outputs/{filename:path}", response_model=None)
+    def yuanshu_output_file(filename: str, request: Request) -> Response:
+        return _yuanshu_owned_output_file(ctx, filename, request)
+
     ctx.route_helpers.update(
         {
             "ensure_queue_worker_running": queue_runtime.ensure_queue_worker_running,
@@ -325,7 +349,7 @@ def create_app(
                 storage, task_id, metadata, api_settings, api_provider_id
             ),
             "save_uploads": lambda task_id, files, kind="input": _save_uploads(storage, task_id, files, kind=kind),
-            "save_reference_assets": lambda files: _save_reference_assets(reference_asset_storage, files),
+            "save_reference_assets": lambda files, request=None: _save_reference_assets(reference_asset_storage, files, request=request, ctx=ctx),
             "dedupe_reference_assets": _dedupe_reference_assets,
             "build_image_request_payload": lambda **kwargs: _build_image_request_payload(**kwargs),
             "slim_request_payload": lambda request_payload, **kwargs: _slim_request_payload(request_payload, **kwargs),
@@ -476,9 +500,16 @@ async def _save_uploads(storage: TaskStorage, task_id: str, files: list[UploadFi
     return saved
 
 
-async def _save_reference_assets(storage: ReferenceAssetStorage, files: list[UploadFile]) -> list[dict[str, Any]]:
+async def _save_reference_assets(
+    storage: ReferenceAssetStorage,
+    files: list[UploadFile],
+    *,
+    request: Request | None = None,
+    ctx: WebUIContext | None = None,
+) -> list[dict[str, Any]]:
     assets: list[dict[str, Any]] = []
     seen: set[str] = set()
+    owner = current_yuanshu_owner_for_request(ctx, request) if ctx is not None and request is not None else None
     for upload in files:
         data = await upload.read()
         if not data:
@@ -489,6 +520,8 @@ async def _save_reference_assets(storage: ReferenceAssetStorage, files: list[Upl
         if mime_type is None:
             raise HTTPException(status_code=400, detail=f"Unsupported image type: {upload.content_type or 'application/octet-stream'}")
         item = storage.create_or_touch(upload.filename or "image.png", data, mime_type)
+        if owner is not None:
+            item = storage.set_owner(str(item["id"]), owner)
         if item["id"] in seen:
             continue
         seen.add(item["id"])
@@ -534,6 +567,41 @@ def _mark_task_cancelled(storage: TaskStorage, task_id: str) -> dict[str, Any]:
     metadata.pop("request", None)
     storage.write_metadata(task_id, metadata)
     return metadata
+
+
+def _yuanshu_owned_output_file(ctx: WebUIContext, filename: str, request: Request) -> Response:
+    clean = str(filename or "").strip().lstrip("/")
+    if not clean:
+        raise HTTPException(status_code=404, detail="Output not found")
+    output_path = ctx.storage.output_path(clean)
+    if not output_path.is_file():
+        raise HTTPException(status_code=404, detail="Output not found")
+    root = ctx.storage.output_root.resolve(strict=False)
+    try:
+        output_path.resolve(strict=False).relative_to(root)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Output not found") from exc
+
+    normalized = ctx.storage.output_file(output_path)
+    for metadata in ctx.storage.list_tasks():
+        if not metadata_matches_current_yuanshu_owner(ctx, metadata, request):
+            continue
+        output_files = metadata.get("output_files") if isinstance(metadata.get("output_files"), list) else []
+        if normalized == str(metadata.get("output_file") or "") or normalized in {str(item) for item in output_files if item}:
+            return FileResponse(
+                output_path,
+                media_type=_guess_mime_type(output_path.name),
+                headers={"Cache-Control": "private, no-store"},
+            )
+        outputs = metadata.get("outputs") if isinstance(metadata.get("outputs"), list) else []
+        for output in outputs:
+            if isinstance(output, dict) and normalized == str(output.get("file") or ""):
+                return FileResponse(
+                    output_path,
+                    media_type=_guess_mime_type(output_path.name),
+                    headers={"Cache-Control": "private, no-store"},
+                )
+    raise HTTPException(status_code=404, detail="Output not found")
 
 
 app = create_app()

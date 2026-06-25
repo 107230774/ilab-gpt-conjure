@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import Body, FastAPI, File, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 from codex_image.webui.context import WebUIContext
@@ -15,19 +15,34 @@ from codex_image.webui.settings_store import (
     _parse_color_palette_import,
 )
 from codex_image.webui.startup_auth import AUTH_SOURCES
+from codex_image.webui.yuanshu_scope import current_yuanshu_session
 
 
 def register_settings_routes(app: FastAPI, ctx: WebUIContext) -> None:
     h = ctx.route_helpers
 
+    def yuanshu_auth_payload(available: bool) -> dict[str, Any]:
+        return {
+            "selected_source": "api",
+            "effective_source": "api" if available else "",
+            "auth_available": available,
+            "sources": {
+                "api": {"available": available},
+                "codex": {"available": False},
+            },
+        }
+
     @app.get("/api/health")
-    def health() -> dict[str, Any]:
-        auth_available = bool(ctx.yuanshu.token) or bool(ctx.auth_checker())
+    def health(request: Request) -> dict[str, Any]:
+        yuanshu_session = current_yuanshu_session(ctx, request)
+        auth_available = bool(yuanshu_session) or bool(ctx.yuanshu.token) or bool(ctx.auth_checker())
         queue_worker = getattr(app, "state", None) and getattr(app.state, "queue_worker_task", None)
-        auth = h["auth_event_payload"]()
+        auth = yuanshu_auth_payload(bool(yuanshu_session) or bool(ctx.yuanshu.token)) if (yuanshu_session or ctx.yuanshu.token) else h["auth_event_payload"]()
+        yuanshu_status = "ready" if yuanshu_session else "auth_expired"
         return {
             "ok": True,
             "auth_available": auth_available,
+            "yuanshu_status": yuanshu_status,
             "auth": auth,
             "input_root": str(ctx.input_root),
             "output_root": str(ctx.output_root),
@@ -246,17 +261,9 @@ def register_settings_routes(app: FastAPI, ctx: WebUIContext) -> None:
         return {"templates": settings["templates"], "categories": settings["categories"], "restart_required": False}
 
     @app.get("/api/auth")
-    def get_auth() -> dict[str, Any]:
-        if ctx.yuanshu.token:
-            return {
-                "selected_source": "api",
-                "effective_source": "api",
-                "auth_available": True,
-                "sources": {
-                    "api": {"available": True},
-                    "codex": {"available": False},
-                },
-            }
+    def get_auth(request: Request) -> dict[str, Any]:
+        if current_yuanshu_session(ctx, request) is not None or ctx.yuanshu.token:
+            return yuanshu_auth_payload(True)
         return h["auth_status"](ctx.auth_settings.read_source())
 
     @app.patch("/api/auth")

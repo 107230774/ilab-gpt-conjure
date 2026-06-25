@@ -41,6 +41,7 @@ class WebUIContext:
     running_worker_tasks: dict[str, Any] = field(default_factory=dict)
     api_request_semaphores: dict[str, dict[str, Any]] = field(default_factory=dict)
     yuanshu: YuanshuBootstrapState = field(default_factory=YuanshuBootstrapState)
+    yuanshu_sessions: dict[str, dict[str, Any]] = field(default_factory=dict)
     route_helpers: dict[str, Any] = field(default_factory=dict)
 
     def install_on_app_state(self) -> None:
@@ -65,6 +66,7 @@ class WebUIContext:
         self.app.state.running_worker_tasks = self.running_worker_tasks
         self.app.state.api_request_semaphores = self.api_request_semaphores
         self.app.state.yuanshu = self.yuanshu
+        self.app.state.yuanshu_sessions = self.yuanshu_sessions
         self.app.state.route_helpers = self.route_helpers
         if self.queue_manager is not None:
             self.app.state.queue_manager = self.queue_manager

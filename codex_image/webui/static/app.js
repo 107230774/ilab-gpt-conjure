@@ -12696,6 +12696,29 @@
 
   // codex_image/webui/frontend/src/yuanshu-paths.ts
   var YUANSHU_BASE_PATH = "/image-playground";
+  var yuanshuSessionId = "";
+  var yuanshuScopeId = "";
+  var consecutiveUnavailableResponses = 0;
+  function setYuanshuSessionId(value) {
+    yuanshuSessionId = String(value || "").trim();
+    const win = window;
+    win.__yuanshuSessionId = yuanshuSessionId;
+    document.documentElement.dataset.yuanshuSessionId = yuanshuSessionId;
+  }
+  function hasYuanshuSession() {
+    return Boolean(getYuanshuSessionId());
+  }
+  function getYuanshuSessionId() {
+    const win = window;
+    return yuanshuSessionId || String(win.__yuanshuSessionId || "").trim() || String(document.documentElement.dataset.yuanshuSessionId || "").trim();
+  }
+  function setYuanshuScopeId(value) {
+    yuanshuScopeId = String(value || "").trim();
+    document.documentElement.dataset.yuanshuScopeId = yuanshuScopeId;
+  }
+  function currentYuanshuStorageScope() {
+    return yuanshuScopeId || "default";
+  }
   function isExternalUrl(value) {
     return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(value);
   }
@@ -12719,7 +12742,27 @@
     if (win.__yuanshuPathRuntimeInstalled) return;
     win.__yuanshuPathRuntimeInstalled = true;
     const originalFetch = window.fetch.bind(window);
-    window.fetch = ((input, init) => originalFetch(normalizeRequestInfo(input), init));
+    window.fetch = (async (input, init) => {
+      const normalized = normalizeRequestInfo(input);
+      const headers = new Headers(init?.headers || (normalized instanceof Request ? normalized.headers : void 0));
+      if (yuanshuSessionId) {
+        headers.set("X-Yuanshu-Session", yuanshuSessionId);
+      }
+      const response = await originalFetch(normalized, { ...init || {}, headers });
+      if (response.status === 401 || response.status === 403) {
+        window.parent?.postMessage({ type: "yuanshu:image-playground-session-expired" }, window.location.origin);
+      }
+      if ([502, 503, 504].includes(response.status)) {
+        consecutiveUnavailableResponses += 1;
+        if (consecutiveUnavailableResponses >= 3) {
+          window.closeRealtimeUpdates?.();
+          window.parent?.postMessage({ type: "yuanshu:image-playground-unavailable" }, window.location.origin);
+        }
+      } else if (response.status < 500) {
+        consecutiveUnavailableResponses = 0;
+      }
+      return response;
+    });
     const NativeEventSource = window.EventSource;
     if (NativeEventSource) {
       window.EventSource = class YuanshuEventSource extends NativeEventSource {
@@ -12758,12 +12801,19 @@
       edited: false
     };
   }
+  function referenceAssetImageUrl(item) {
+    const explicitUrl = item?.image_url || item?.previewUrl || item?.preview_url || item?.thumbnail_url || "";
+    if (explicitUrl) return yuanshuPath(explicitUrl);
+    const id = String(item?.id || "").trim();
+    return id ? yuanshuPath(`/api/reference-assets/${encodeURIComponent(id)}/image`) : "";
+  }
   function isImageFile(file) {
     if (!file) return false;
     if (String(file.type || "").startsWith("image/")) return true;
     return /\.(avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)$/i.test(String(file.name || ""));
   }
   function gallerySource(item) {
+    const imageUrl = yuanshuPath(item.image_url || "");
     return {
       kind: "gallery",
       id: item.id,
@@ -12772,27 +12822,29 @@
       category_name: item.category_name || legacyMethod2("categoryLabel", item.category),
       category_prompt_role: item.category_prompt_role || legacyMethod2("categoryPromptRole", item.category),
       prompt_note: item.prompt_note || "",
-      image_url: item.image_url || "",
-      previewUrl: item.image_url || "",
+      image_url: imageUrl,
+      previewUrl: imageUrl,
       missing: Boolean(item.missing)
     };
   }
   function assetSource(item) {
+    const imageUrl = referenceAssetImageUrl(item);
     return {
       kind: "asset",
       id: item.id,
       name: item.name || item.filename || "",
       filename: item.filename || "",
       mime_type: item.mime_type || "",
-      image_url: item.image_url || "",
-      previewUrl: item.image_url || "",
+      image_url: imageUrl,
+      previewUrl: imageUrl,
       missing: Boolean(item.missing)
     };
   }
   function sourcePreviewUrl(source) {
     if (!source) return "";
-    if (source.kind === "upload") return source.previewUrl;
-    return source.image_url || source.previewUrl || "";
+    if (source.kind === "upload") return source.previewUrl || yuanshuPath(source.image_url || source.preview_url || "");
+    if (source.kind === "asset") return referenceAssetImageUrl(source);
+    return yuanshuPath(source.image_url || source.previewUrl || source.preview_url || source.thumbnail_url || "");
   }
   function sourceListUsesPreviewUrl(sources, previewUrl, ignoredSources = /* @__PURE__ */ new Set()) {
     return Array.isArray(sources) && sources.some((source) => {
@@ -26563,6 +26615,15 @@ ${hint}` : hint;
         image.src = previewUrl;
       }
       image.alt = legacyMethod4("sourceName", source);
+      image.addEventListener("error", () => {
+        const fallbackUrl = legacyMethod4("sourcePreviewUrl", source);
+        if (fallbackUrl && image.src !== new URL(fallbackUrl, window.location.origin).href) {
+          image.src = fallbackUrl;
+          return;
+        }
+        image.alt = "";
+        wrapper.classList.add("missing-thumb");
+      }, { once: true });
       wrapper.title = source.missing ? source.kind === "asset" ? translate("imageInput.deletedRecent") : translate("imageInput.deletedGallery") : legacyMethod4("sourceName", source);
       if (legacyMethod4("isEditableImageSource", source)) {
         wrapper.classList.add("editable-thumb");
@@ -28743,6 +28804,26 @@ ${hint}` : hint;
   var bridge8 = getLegacyBridge();
   var state8 = bridge8.state;
   var els9 = bridge8.els;
+  function isYuanshuMode() {
+    return document.documentElement.dataset.yuanshuMode === "true" || window.location.pathname.startsWith("/image-playground");
+  }
+  function yuanshuAuthStatus(auth) {
+    if (!isYuanshuMode()) return auth;
+    return {
+      ...auth || {},
+      selected_source: "api",
+      effective_source: "api",
+      auth_available: true,
+      sources: {
+        ...auth?.sources || {},
+        api: {
+          ...auth?.sources?.api || {},
+          available: true,
+          api_mode: "images"
+        }
+      }
+    };
+  }
   function legacyMethod12(name, ...args) {
     const method = getLegacyBridge().methods[name];
     if (typeof method !== "function") {
@@ -28773,10 +28854,15 @@ ${hint}` : hint;
   }
   async function refreshHealth() {
     try {
-      const response = await fetch("/api/health");
+      const headers = new Headers();
+      const yuanshuSessionId2 = getYuanshuSessionId();
+      if (yuanshuSessionId2) {
+        headers.set("X-Yuanshu-Session", yuanshuSessionId2);
+      }
+      const response = await fetch(yuanshuPath("/api/health"), { headers });
       const data = await response.json();
-      state8.authAvailable = Boolean(data.auth_available);
-      state8.authStatus = data.auth || null;
+      state8.authAvailable = isYuanshuMode() && yuanshuSessionId2 ? true : Boolean(data.auth_available);
+      state8.authStatus = state8.authAvailable ? yuanshuAuthStatus(data.auth || null) : data.auth || null;
       renderAuthSource(state8.authStatus);
       els9.apiStatus.className = `status-dot ${state8.authAvailable ? "ok" : "error"}`;
       els9.runButton.disabled = !state8.authAvailable;
@@ -28796,9 +28882,14 @@ ${hint}` : hint;
     applyAuthSourceSelection(source);
     updateRequestPreview4();
     try {
-      const response = await fetch("/api/auth", {
+      const headers = new Headers({ "Content-Type": "application/json" });
+      const yuanshuSessionId2 = getYuanshuSessionId();
+      if (yuanshuSessionId2) {
+        headers.set("X-Yuanshu-Session", yuanshuSessionId2);
+      }
+      const response = await fetch(yuanshuPath("/api/auth"), {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ source })
       });
       const data = await response.json();
@@ -28847,6 +28938,9 @@ ${hint}` : hint;
   }
   function authSourceDetailText(auth) {
     if (!auth) return translate("auth.checking");
+    if (isYuanshuMode() && (state8.authAvailable || auth.auth_available)) {
+      return "\u5143\u67A2\u63A5\u53E3\u5DF2\u8FDE\u63A5";
+    }
     const selected = sourceLabel(auth.selected_source);
     const effectiveApi = auth.effective_source === "api";
     if (!auth.auth_available) {
@@ -34034,6 +34128,10 @@ ${galleryText}`;
         params.orientation = orientationForDimensions(dimensions[0], dimensions[1]);
       }
     }
+    if (document.documentElement.dataset.yuanshuMode === "true" && params.resolution === "4k") {
+      params.resolution = "2k";
+      params.size = sizeForPreset("2k", params.ratio || DEFAULT_RATIO);
+    }
     if (currentAuthSource2() === "api") {
       params.api_provider_id = currentApiProviderId();
       params.api_mode = currentApiMode3();
@@ -34715,6 +34813,11 @@ ${galleryText}`;
     const layout = taskAnchorLayout(groups, expandedGroup?.key || null, query);
     const nextRenderKey = taskListRenderKey(tasks, query, layout, filters, activeGroup);
     if (state19.tasksRenderKey === nextRenderKey) {
+      const expandedKey = layout.expandedKey || layout.expandedGroup?.key || "";
+      const expandedBody = expandedKey ? expandedTaskGroupItemsContainer(String(expandedKey)) : null;
+      if (layout.expandedGroup && expandedBody && !expandedBody.dataset.renderComplete && !expandedBody.querySelector(".task-card")) {
+        scheduleExpandedTaskGroupItemsRender(layout.expandedGroup, expandedKey);
+      }
       updateTaskElapsedDisplays2();
       restoreTaskListScrollAnchor(scrollAnchor);
       return;
@@ -34920,7 +35023,7 @@ ${galleryText}`;
         body.dataset.renderComplete = "true";
       }
     };
-    requestAnimationFrame(renderChunk);
+    renderChunk();
   }
   function taskCardRoot() {
     return els28.taskHistoryShell || els28.sidebarContent || els28.taskList;
@@ -35048,9 +35151,9 @@ ${galleryText}`;
     tasks.forEach((task) => {
       const taskId = String(task?.task_id || "");
       const status = String(task?.status || "");
-      if (queueIds.running.has(taskId) || status === "running") {
+      if (queueIds.running.has(taskId)) {
         running.push(task);
-      } else if (queueIds.waiting.has(taskId) || task?.local_pending || ["submitting", "queued"].includes(status)) {
+      } else if (queueIds.waiting.has(taskId) || task?.local_pending || status === "submitting" && !taskId.startsWith("pending-")) {
         waiting.push(task);
       }
     });
@@ -35398,8 +35501,12 @@ ${galleryText}`;
   `;
   }
   function isAlwaysVisibleTask(task) {
+    const taskId = String(task?.task_id || "");
     const status = String(task?.status || "");
-    return Boolean(task?.local_pending || ["submitting", "queued", "running"].includes(status));
+    const queueIds = queueTaskIdsBySection();
+    return Boolean(
+      task?.local_pending || queueIds.running.has(taskId) || queueIds.waiting.has(taskId) || status === "submitting" && !taskId.startsWith("pending-")
+    );
   }
   function queueTaskIdsBySection() {
     const runningIds = (state19.queue.running || []).map((task) => String(task.task_id || ""));
@@ -35416,10 +35523,8 @@ ${galleryText}`;
   function activeTaskOrderIndex(task, sectionIds = queueTaskIdsBySection()) {
     const taskId = String(task?.task_id || "");
     if (sectionIds.running.has(taskId)) return sectionIds.running.get(taskId) || 0;
-    if (String(task?.status || "") === "running") return 1e3;
     if (sectionIds.waiting.has(taskId)) return 2e3 + (sectionIds.waiting.get(taskId) || 0);
     if (task?.local_pending || String(task?.status || "") === "submitting") return 3e3;
-    if (String(task?.status || "") === "queued") return 4e3;
     return 5e3;
   }
   function activeTasksForGroup(tasks) {
@@ -36709,6 +36814,7 @@ ${galleryText}`;
     return method(...args);
   }
   var SUBMIT_TASK_TIMEOUT_MS = 45e3;
+  var YUANSHU_SUBMIT_SETTLE_REFRESH_DELAYS_MS = [1e3, 2500, 5e3, 9e3, 15e3, 25e3, 4e4, 6e4];
   function errorMessage4(error, fallback) {
     return error instanceof Error ? error.message || fallback : fallback;
   }
@@ -36844,7 +36950,7 @@ ${galleryText}`;
   function renderPreview4(...args) {
     return legacyMethod34("renderPreview", ...args);
   }
-  function isYuanshuMode() {
+  function isYuanshuMode2() {
     return document.documentElement.dataset.yuanshuMode === "true";
   }
   function applyTaskToForm(task) {
@@ -36912,7 +37018,7 @@ ${galleryText}`;
     const uploads = uploadInputs3();
     const galleries = galleryInputs4();
     const assets = referenceAssetInputs3();
-    const yuanshuMode = isYuanshuMode();
+    const yuanshuMode = isYuanshuMode2();
     const authSource = yuanshuMode ? "api" : currentAuthSource3();
     const isApi = authSource === "api";
     const isCodex = authSource === "codex";
@@ -37033,6 +37139,14 @@ ${galleryText}`;
   function addQueuedTask(task) {
     replacePendingTask2(state24.pendingTaskId || task.task_id, task);
   }
+  function scheduleYuanshuSubmitSettleRefresh() {
+    YUANSHU_SUBMIT_SETTLE_REFRESH_DELAYS_MS.forEach((delay) => {
+      window.setTimeout(() => {
+        void window.refreshQueue?.();
+        void getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+      }, delay);
+    });
+  }
   async function runTask() {
     syncPromptFromEditor6();
     syncGalleryInputsFromPrompt3();
@@ -37041,7 +37155,7 @@ ${galleryText}`;
     const uploads = uploadInputs3();
     const galleries = galleryInputs4();
     const assets = referenceAssetInputs3();
-    const yuanshuMode = isYuanshuMode();
+    const yuanshuMode = isYuanshuMode2();
     if (missingGalleryInputs2().length) {
       setStatus17(translate("status.missingGalleryReference"), "error");
       return;
@@ -37092,13 +37206,20 @@ ${galleryText}`;
     }
     galleries.forEach((source) => form.append("gallery_image_ids", source.id));
     assets.forEach((source) => form.append("reference_asset_ids", source.id));
+    if (yuanshuMode && !hasYuanshuSession()) {
+      setStatus17("\u5143\u67A2\u5728\u7EBF\u751F\u56FE\u6388\u6743\u521D\u59CB\u5316\u4E2D\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5\u3002", "error");
+      window.parent?.postMessage({ type: "yuanshu:image-playground-ready" }, window.location.origin);
+      return;
+    }
     if (yuanshuMode || state24.mode === "generate") {
       uploads.forEach((source) => form.append("reference_images", source.file));
     } else {
       uploads.forEach((source) => form.append("images", source.file));
     }
     const pendingTask = createPendingTask();
-    addPendingTask2(pendingTask);
+    if (!yuanshuMode) {
+      addPendingTask2(pendingTask);
+    }
     if (els33.requestJson) {
       els33.requestJson.textContent = JSON.stringify(pendingTask.request, null, 2);
     }
@@ -37107,9 +37228,16 @@ ${galleryText}`;
     const controller = new AbortController();
     const submitTimeoutId = window.setTimeout(() => controller.abort(), SUBMIT_TASK_TIMEOUT_MS);
     try {
-      const response = await fetch(!yuanshuMode && state24.mode === "edit" ? "/api/edit" : "/api/generate", {
+      const headers = new Headers();
+      const yuanshuSessionId2 = getYuanshuSessionId();
+      if (yuanshuMode && yuanshuSessionId2) {
+        headers.set("X-Yuanshu-Session", yuanshuSessionId2);
+      }
+      const endpoint = !yuanshuMode && state24.mode === "edit" ? "/api/edit" : "/api/generate";
+      const response = await fetch(yuanshuPath(endpoint), {
         method: "POST",
         body: form,
+        headers,
         signal: controller.signal
       });
       const data = await response.json();
@@ -37117,18 +37245,27 @@ ${galleryText}`;
         throw new Error(data.detail || translate("taskSubmit.requestFailed"));
       }
       addQueuedTask(data.task);
+      if (yuanshuMode) {
+        window.startRealtimeUpdates?.({ migrateLegacyArchives: false });
+        scheduleYuanshuSubmitSettleRefresh();
+      }
       if (els33.requestJson) {
         els33.requestJson.textContent = JSON.stringify(data.request || {}, null, 2);
       }
       stopRunFeedback2();
       setStatus17(translate("taskSubmit.queued"), "ok");
       await window.refreshQueue?.();
+      await getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
       await refreshRecentAssets2();
       renderPreview4(data.task);
     } catch (error) {
       stopRunFeedback2();
       const message = error instanceof DOMException && error.name === "AbortError" ? translate("taskSubmit.timeout") : errorMessage4(error, translate("taskSubmit.failed"));
-      markPendingTaskFailed2(pendingTask.task_id, message);
+      if (!yuanshuMode) {
+        markPendingTaskFailed2(pendingTask.task_id, message);
+      } else if (message.includes("expired") || message.includes("authorization") || message.includes("auth") || message.includes("401")) {
+        window.parent?.postMessage({ type: "yuanshu:image-playground-session-expired" }, window.location.origin);
+      }
       setStatus17(message, "error");
     } finally {
       window.clearTimeout(submitTimeoutId);
@@ -37291,7 +37428,28 @@ ${galleryText}`;
   // codex_image/webui/frontend/src/queue.ts
   var REALTIME_EVENTS_URL = "/api/events?stream=1";
   var QUEUE_DISPATCH_RESYNC_DELAY_MS = 1500;
+  var YUANSHU_QUEUE_POLL_INTERVAL_MS = 5e3;
+  var YUANSHU_COMPLETION_REFRESH_DELAYS_MS = [0, 500, 1500, 3e3];
+  var TERMINAL_TASK_STATUSES = /* @__PURE__ */ new Set(["completed", "failed", "partial_failed"]);
+  var YUANSHU_TASK_DETAIL_REFRESH_DELAYS_MS = [0, 700, 1800, 3500];
+  var ACTIVE_TASK_STATUSES = /* @__PURE__ */ new Set(["submitting", "queued", "running"]);
   var queueFeatureInitialized = false;
+  var yuanshuQueuePollTimerId = null;
+  var yuanshuCompletionRefreshTimerIds = [];
+  var yuanshuTaskDetailRefreshTimerIds = [];
+  function yuanshuSessionHeaders() {
+    const headers = new Headers();
+    const yuanshuSessionId2 = getYuanshuSessionId();
+    if (yuanshuSessionId2) {
+      headers.set("X-Yuanshu-Session", yuanshuSessionId2);
+      headers.set("Cache-Control", "no-cache");
+    }
+    return headers;
+  }
+  function noStoreUrl(path) {
+    const separator = path.includes("?") ? "&" : "?";
+    return yuanshuPath(`${path}${separator}_=${Date.now()}`);
+  }
   function initializeQueueFeature() {
     if (queueFeatureInitialized) return;
     queueFeatureInitialized = true;
@@ -37314,6 +37472,11 @@ ${galleryText}`;
   function startRealtimeUpdates({ migrateLegacyArchives = false } = {}) {
     const state32 = getState();
     if (!window.EventSource) return false;
+    if (isYuanshuEmbeddedMode()) {
+      closeRealtimeUpdates();
+      startYuanshuQueuePolling({ migrateLegacyArchives });
+      return false;
+    }
     closeRealtimeUpdates();
     state32.realtimeSnapshotNeedsArchiveMigration = migrateLegacyArchives;
     const source = new EventSource(REALTIME_EVENTS_URL);
@@ -37330,16 +37493,97 @@ ${galleryText}`;
       closeRealtimeUpdates();
       state32.realtimeSnapshotNeedsArchiveMigration = false;
       void refreshQueue();
-      void getLegacyBridge().methods.refreshTasks({ migrateLegacyArchives: shouldMigrateArchives });
+      void getLegacyBridge().methods.refreshTasks({ migrateLegacyArchives: shouldMigrateArchives, preserveExistingOnEmpty: true });
       getLegacyBridge().methods.setStatus(translate("queue.realtimeDisconnected"), "error");
     };
     return true;
   }
   function closeRealtimeUpdates() {
     const state32 = getState();
+    stopYuanshuQueuePolling();
     if (!state32.realtimeSource) return;
     state32.realtimeSource.close();
     state32.realtimeSource = null;
+  }
+  function isYuanshuEmbeddedMode() {
+    return window.location.pathname.startsWith("/image-playground");
+  }
+  function startYuanshuQueuePolling({ migrateLegacyArchives = false } = {}) {
+    const pollOnce = (shouldMigrateArchives2 = false) => {
+      void refreshQueue();
+      void getLegacyBridge().methods.refreshTasks?.({
+        migrateLegacyArchives: shouldMigrateArchives2,
+        preserveExistingOnEmpty: true
+      });
+    };
+    if (yuanshuQueuePollTimerId !== null) {
+      pollOnce(migrateLegacyArchives);
+      return;
+    }
+    let shouldMigrateArchives = migrateLegacyArchives;
+    const poll = () => {
+      pollOnce(shouldMigrateArchives);
+      shouldMigrateArchives = false;
+    };
+    yuanshuQueuePollTimerId = window.setInterval(poll, YUANSHU_QUEUE_POLL_INTERVAL_MS);
+    window.addEventListener("pagehide", stopYuanshuQueuePolling, { once: true });
+    document.addEventListener("visibilitychange", poll);
+    poll();
+  }
+  function stopYuanshuQueuePolling() {
+    if (yuanshuQueuePollTimerId === null) return;
+    window.clearInterval(yuanshuQueuePollTimerId);
+    yuanshuQueuePollTimerId = null;
+  }
+  function scheduleYuanshuCompletionRefreshBurst() {
+    if (!isYuanshuEmbeddedMode()) {
+      void getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+      return;
+    }
+    yuanshuCompletionRefreshTimerIds.forEach((timerId) => window.clearTimeout(timerId));
+    yuanshuCompletionRefreshTimerIds = YUANSHU_COMPLETION_REFRESH_DELAYS_MS.map((delay) => window.setTimeout(() => {
+      void getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+    }, delay));
+  }
+  async function refreshCompletedQueueSnapshot() {
+    const bridge39 = getLegacyBridge();
+    bridge39.state.tasksRenderKey = null;
+    await bridge39.methods.refreshTasks?.({ preserveExistingOnEmpty: false });
+    bridge39.methods.renderTasks?.();
+    bridge39.methods.renderPreview?.();
+  }
+  function scheduleYuanshuTaskDetailRefreshBurst(taskIds) {
+    const ids = [...new Set([...taskIds].map(String).filter(Boolean))];
+    if (!ids.length) return;
+    if (!isYuanshuEmbeddedMode()) {
+      ids.forEach((taskId) => void refreshTaskDetailIntoSidebar(taskId));
+      return;
+    }
+    yuanshuTaskDetailRefreshTimerIds.forEach((timerId) => window.clearTimeout(timerId));
+    yuanshuTaskDetailRefreshTimerIds = [];
+    ids.forEach((taskId) => {
+      YUANSHU_TASK_DETAIL_REFRESH_DELAYS_MS.forEach((delay) => {
+        const timerId = window.setTimeout(() => {
+          void refreshTaskDetailIntoSidebar(taskId);
+        }, delay);
+        yuanshuTaskDetailRefreshTimerIds.push(timerId);
+      });
+    });
+  }
+  async function refreshTaskDetailIntoSidebar(taskId) {
+    const bridge39 = getLegacyBridge();
+    try {
+      const response = await fetch(noStoreUrl(`/api/tasks/${encodeURIComponent(taskId)}`), {
+        cache: "no-store",
+        headers: yuanshuSessionHeaders()
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.task) return;
+      bridge39.methods.applyTaskUpdate?.(data.task);
+      await bridge39.methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+    } catch (error) {
+      console.warn(error);
+    }
   }
   async function handleRealtimeMessage(event) {
     if (!event.data) return;
@@ -37367,21 +37611,33 @@ ${galleryText}`;
       const previousTask = state32.tasks.find((item) => String(item.task_id) === String(payload2.task?.task_id));
       bridge39.methods.notifyTaskUpdate?.(previousTask, payload2.task);
       bridge39.methods.applyTaskUpdate(payload2.task);
+      if (TERMINAL_TASK_STATUSES.has(String(payload2.task?.status || ""))) {
+        scheduleYuanshuCompletionRefreshBurst();
+        if (payload2.task?.task_id) {
+          scheduleYuanshuTaskDetailRefreshBurst([String(payload2.task.task_id)]);
+        }
+      }
     }
   }
   async function refreshQueue() {
     const bridge39 = getLegacyBridge();
     const state32 = bridge39.state;
     const requestSeq = ++state32.queueRequestSeq;
+    const previousActiveTaskIds = currentActiveTaskIds();
     try {
-      const response = await fetch("/api/queue");
+      const response = await fetch(noStoreUrl("/api/queue"), {
+        cache: "no-store",
+        headers: yuanshuSessionHeaders()
+      });
       const data = await response.json();
       if (requestSeq !== state32.queueRequestSeq) return;
       if (!response.ok) {
         throw new Error(data.detail || translate("queue.readFailed"));
       }
-      state32.queue = normalizeQueueState(data);
+      const queue = normalizeQueueState(data);
+      state32.queue = queue;
       renderQueue();
+      applyQueueTasks(queue, { previousActiveTaskIds });
     } catch (error) {
       bridge39.methods.setStatus(errorMessage5(error, translate("queue.readFailed")), "error");
     }
@@ -37676,7 +37932,7 @@ ${galleryText}`;
   function handleQueueDragEnd(_event) {
     getState().queueDragTaskId = null;
   }
-  function applyQueueTasks(queue) {
+  function applyQueueTasks(queue, { previousActiveTaskIds = currentActiveTaskIds() } = {}) {
     const bridge39 = getLegacyBridge();
     const tasks = [
       ...Array.isArray(queue?.waiting) ? queue.waiting : [],
@@ -37684,24 +37940,36 @@ ${galleryText}`;
     ];
     const queueTaskIds = new Set(tasks.map((task) => String(task.task_id)));
     const needsTaskReconcile = activeTasksNeedQueueReconcile(queueTaskIds);
+    const completedActiveTaskMissingFromQueue = activeTasksMissingFromQueue(previousActiveTaskIds, queueTaskIds);
+    const missingActiveTaskIds = activeTaskIdsMissingFromQueue(previousActiveTaskIds, queueTaskIds);
     if (!tasks.length) {
-      if (needsTaskReconcile) {
-        void bridge39.methods.refreshTasks();
+      if (needsTaskReconcile || completedActiveTaskMissingFromQueue) {
+        scheduleYuanshuCompletionRefreshBurst();
+        scheduleYuanshuTaskDetailRefreshBurst(missingActiveTaskIds);
+        void refreshCompletedQueueSnapshot();
+      } else if (bridge39.els.taskActiveList && !bridge39.els.taskActiveList.classList.contains("hidden")) {
+        bridge39.state.tasksRenderKey = null;
+        bridge39.methods.renderTasks?.();
       }
       return;
     }
     let changed = false;
+    let terminalTransition = false;
     tasks.forEach((task) => {
       const previousTask = bridge39.state.tasks.find((item) => String(item.task_id) === String(task.task_id));
       bridge39.methods.notifyTaskUpdate?.(previousTask, task);
       changed = bridge39.methods.updateTaskInState(task) || changed;
+      if (isTerminalTaskTransition(previousTask, task)) {
+        terminalTransition = true;
+      }
       if (String(task.task_id) === String(bridge39.state.selectedTaskId) && bridge39.methods.taskHasViewableUpdate(task)) {
         void bridge39.methods.markTaskViewed(task.task_id);
       }
     });
     if (!changed) {
-      if (needsTaskReconcile) {
-        void bridge39.methods.refreshTasks();
+      if (needsTaskReconcile || completedActiveTaskMissingFromQueue) {
+        scheduleYuanshuCompletionRefreshBurst();
+        scheduleYuanshuTaskDetailRefreshBurst(missingActiveTaskIds);
       }
       return;
     }
@@ -37710,9 +37978,22 @@ ${galleryText}`;
     bridge39.methods.renderArchiveButton();
     bridge39.methods.renderArchiveModal();
     bridge39.methods.renderPreview();
-    if (needsTaskReconcile) {
-      void bridge39.methods.refreshTasks();
+    if (needsTaskReconcile || completedActiveTaskMissingFromQueue) {
+      scheduleYuanshuCompletionRefreshBurst();
+      scheduleYuanshuTaskDetailRefreshBurst(missingActiveTaskIds);
     }
+    if (terminalTransition) {
+      scheduleYuanshuCompletionRefreshBurst();
+      scheduleYuanshuTaskDetailRefreshBurst(tasks.filter((task) => TERMINAL_TASK_STATUSES.has(String(task?.status || ""))).map((task) => String(task.task_id || "")));
+    }
+  }
+  function isTerminalTaskTransition(previousTask, nextTask) {
+    const taskId = String(nextTask?.task_id || "");
+    if (!taskId) return false;
+    const nextStatus = String(nextTask?.status || "");
+    if (!TERMINAL_TASK_STATUSES.has(nextStatus)) return false;
+    const previousStatus = String(previousTask?.status || "");
+    return !TERMINAL_TASK_STATUSES.has(previousStatus);
   }
   function activeTasksNeedQueueReconcile(queueTaskIds) {
     const bridge39 = getLegacyBridge();
@@ -37720,8 +38001,28 @@ ${galleryText}`;
       const taskId = String(task?.task_id || "");
       if (!taskId || queueTaskIds.has(taskId) || task?.local_pending) return false;
       const status = String(task?.status || "");
-      return status === "submitting" || status === "queued" || status === "running";
+      return ACTIVE_TASK_STATUSES.has(status);
     });
+  }
+  function currentActiveTaskIds() {
+    const bridge39 = getLegacyBridge();
+    return new Set(
+      bridge39.state.tasks.filter((task) => {
+        if (task?.local_pending) return false;
+        const status = String(task?.status || "");
+        return ACTIVE_TASK_STATUSES.has(status);
+      }).map((task) => String(task.task_id || "")).filter(Boolean)
+    );
+  }
+  function activeTasksMissingFromQueue(previousActiveTaskIds, queueTaskIds) {
+    return activeTaskIdsMissingFromQueue(previousActiveTaskIds, queueTaskIds).size > 0;
+  }
+  function activeTaskIdsMissingFromQueue(previousActiveTaskIds, queueTaskIds) {
+    const missing = /* @__PURE__ */ new Set();
+    for (const taskId of previousActiveTaskIds) {
+      if (!queueTaskIds.has(taskId)) missing.add(taskId);
+    }
+    return missing;
   }
   function updateQueueElapsedDisplays() {
     getLegacyBridge().methods.updateTaskElapsedDisplays?.();
@@ -38234,7 +38535,8 @@ ${galleryText}`;
       notifyTaskUpdate,
       openTaskNotificationCenter,
       renderTaskNotifications,
-      requestSystemNotificationPermission
+      requestSystemNotificationPermission,
+      refreshTaskNotificationScope
     });
   }
   function notifyTaskUpdate(previousTask, nextTask) {
@@ -38392,6 +38694,12 @@ ${galleryText}`;
   function clearTaskNotifications() {
     const state32 = getLegacyBridge().state;
     state32.taskNotifications = [];
+    renderTaskNotifications();
+  }
+  function refreshTaskNotificationScope() {
+    const state32 = getLegacyBridge().state;
+    state32.taskNotifications = [];
+    restoreTaskNotificationSeenKeys();
     renderTaskNotifications();
   }
   function showTaskNotificationToast(notification) {
@@ -38602,7 +38910,8 @@ ${galleryText}`;
   function restoreTaskNotificationSeenKeys() {
     const state32 = getLegacyBridge().state;
     try {
-      const stored = JSON.parse(localStorage.getItem(TASK_NOTIFICATION_SEEN_KEY) || "[]");
+      removeLegacyGlobalNotificationSeenKey();
+      const stored = JSON.parse(localStorage.getItem(scopedTaskNotificationSeenKey()) || "[]");
       state32.taskNotificationSeenKeys = new Set(Array.isArray(stored) ? stored.filter((key) => typeof key === "string") : []);
     } catch {
       state32.taskNotificationSeenKeys = /* @__PURE__ */ new Set();
@@ -38610,10 +38919,18 @@ ${galleryText}`;
   }
   function persistTaskNotificationSeenKeys() {
     try {
+      removeLegacyGlobalNotificationSeenKey();
       const keys = Array.from(getLegacyBridge().state.taskNotificationSeenKeys).slice(-MAX_SEEN_TASK_NOTIFICATION_KEYS);
-      localStorage.setItem(TASK_NOTIFICATION_SEEN_KEY, JSON.stringify(keys));
+      localStorage.setItem(scopedTaskNotificationSeenKey(), JSON.stringify(keys));
     } catch {
     }
+  }
+  function removeLegacyGlobalNotificationSeenKey() {
+    if (scopedTaskNotificationSeenKey() === TASK_NOTIFICATION_SEEN_KEY) return;
+    localStorage.removeItem(TASK_NOTIFICATION_SEEN_KEY);
+  }
+  function scopedTaskNotificationSeenKey() {
+    return `${TASK_NOTIFICATION_SEEN_KEY}:${currentYuanshuStorageScope()}`;
   }
   function outputFileUrl(filename) {
     if (filename.startsWith("/outputs/")) return filename;
@@ -39406,6 +39723,9 @@ ${galleryText}`;
     const taskId = String(task?.task_id || "");
     if (queueContainsTask(state28.queue.running, taskId)) return "running";
     if (queueContainsTask(state28.queue.waiting, taskId)) return status === "submitting" ? "submitting" : "queued";
+    if (["running", "queued", "submitting"].includes(status) && !task?.local_pending) {
+      return taskOutputUrls3(task).length ? "completed" : "";
+    }
     return status;
   }
   function renderPreview5(task = null) {
@@ -40207,13 +40527,59 @@ ${galleryText}`;
   var ensureSelectedTaskDetail = (...args) => legacyMethod39("ensureSelectedTaskDetail", ...args);
   var TASK_SEARCH_HISTORY_LIMIT = 100;
   var TASK_SEARCH_HISTORY_DEBOUNCE_MS = 180;
+  var RECENTLY_FINISHED_PRESERVE_MS = 5 * 60 * 1e3;
   var taskSearchHistoryTimerId = 0;
-  async function refreshTasks({ migrateLegacyArchives = false } = {}) {
+  function queuedOrRunningTaskIds() {
+    const queue = state29.queue || {};
+    const waiting = Array.isArray(queue.waiting) ? queue.waiting : [];
+    const running = Array.isArray(queue.running) ? queue.running : [];
+    return new Set(
+      [...waiting, ...running].map((task) => String(task?.task_id || "")).filter(Boolean)
+    );
+  }
+  function noStoreUrl2(path) {
+    const separator = path.includes("?") ? "&" : "?";
+    return yuanshuPath(`${path}${separator}_=${Date.now()}`);
+  }
+  async function refreshTasks({ migrateLegacyArchives = false, preserveExistingOnEmpty = false } = {}) {
     const requestSeq = ++state29.tasksRequestSeq;
-    const response = await fetch("/api/tasks/recent?limit=200");
+    const headers = new Headers();
+    const yuanshuSessionId2 = getYuanshuSessionId();
+    if (yuanshuSessionId2) {
+      headers.set("X-Yuanshu-Session", yuanshuSessionId2);
+      headers.set("Cache-Control", "no-cache");
+    }
+    const response = await fetch(noStoreUrl2("/api/tasks/recent?limit=200"), {
+      cache: "no-store",
+      headers
+    });
     const data = await response.json();
-    if (requestSeq !== state29.tasksRequestSeq) return;
-    await applyTasksSnapshot(data.tasks || [], { migrateLegacyArchives, requestSeq });
+    const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    const staleResponse = requestSeq !== state29.tasksRequestSeq;
+    if (staleResponse && tasks.length === 0) return;
+    if (preserveExistingOnEmpty && tasks.length === 0 && state29.tasks.some((task) => !task?.local_pending)) {
+      return;
+    }
+    await applyTasksSnapshot(preserveExistingOnEmpty ? mergePreservedVisibleTasks(tasks) : tasks, {
+      migrateLegacyArchives,
+      requestSeq: staleResponse ? state29.tasksRequestSeq : requestSeq
+    });
+  }
+  function mergePreservedVisibleTasks(tasks) {
+    const nextTasks = Array.isArray(tasks) ? tasks.slice() : [];
+    const nextIds = new Set(nextTasks.map((task) => String(task?.task_id || "")).filter(Boolean));
+    const queueTaskIds = queuedOrRunningTaskIds();
+    const preserved = state29.tasks.filter((task) => {
+      const taskId = String(task?.task_id || "");
+      if (!taskId || nextIds.has(taskId) || task?.local_pending) return false;
+      const status = String(task?.status || "");
+      if (["submitting", "queued", "running"].includes(status)) return queueTaskIds.has(taskId);
+      if (!["completed", "failed", "partial_failed"].includes(status)) return false;
+      const timestamp = Date.parse(String(task.completed_at || task.updated_at || task.created_at || ""));
+      return Number.isFinite(timestamp) && Date.now() - timestamp < RECENTLY_FINISHED_PRESERVE_MS;
+    });
+    if (!preserved.length) return nextTasks;
+    return [...preserved, ...nextTasks];
   }
   async function applyTasksSnapshot(tasks, { migrateLegacyArchives = false, requestSeq = state29.tasksRequestSeq } = {}) {
     const previousLocalPendingTasks = state29.tasks.filter((task) => task?.local_pending);
@@ -40485,7 +40851,16 @@ ${galleryText}`;
     return urls;
   }
   async function loadFullTaskDetail(taskId) {
-    const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
+    const headers = new Headers();
+    const yuanshuSessionId2 = getYuanshuSessionId();
+    if (yuanshuSessionId2) {
+      headers.set("X-Yuanshu-Session", yuanshuSessionId2);
+      headers.set("Cache-Control", "no-cache");
+    }
+    const response = await fetch(yuanshuPath(`/api/tasks/${encodeURIComponent(taskId)}?_=${Date.now()}`), {
+      cache: "no-store",
+      headers
+    });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || translate("notifications.taskMissing"));
     return data.task;
@@ -41689,6 +42064,8 @@ ${galleryText}`;
   }
 
   // codex_image/webui/frontend/src/yuanshu.ts
+  var bootstrapReadyTimerId = null;
+  var activeBootstrapScope = "";
   function applyYuanshuChrome() {
     document.documentElement.dataset.yuanshuMode = "true";
     document.title = "\u5143\u67A2\u5728\u7EBF\u751F\u56FE";
@@ -41698,7 +42075,7 @@ ${galleryText}`;
     if (brandSubtitle) brandSubtitle.textContent = "\u5728\u7EBF\u751F\u56FE";
   }
   async function postYuanshuBootstrap(payload2) {
-    const response = await fetch("/api/yuanshu/bootstrap", {
+    const response = await fetch(yuanshuPath("/api/yuanshu/bootstrap"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload2)
@@ -41712,26 +42089,75 @@ ${galleryText}`;
   function isBootstrapMessage(event) {
     return event.origin === window.location.origin && event.data && typeof event.data === "object" && event.data.type === "yuanshu:image-playground-bootstrap";
   }
-  function initYuanshuModeFeature() {
-    applyYuanshuChrome();
+  function postReadyToParent() {
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({ type: "yuanshu:image-playground-ready" }, window.location.origin);
     }
+  }
+  function startBootstrapReadyRetry() {
+    postReadyToParent();
+    if (bootstrapReadyTimerId !== null) return;
+    bootstrapReadyTimerId = window.setInterval(postReadyToParent, 1e3);
+    window.addEventListener("pagehide", stopBootstrapReadyRetry, { once: true });
+  }
+  function stopBootstrapReadyRetry() {
+    if (bootstrapReadyTimerId === null) return;
+    window.clearInterval(bootstrapReadyTimerId);
+    bootstrapReadyTimerId = null;
+  }
+  function resetYuanshuWorkspaceForScope(scopeId) {
+    const bridge39 = getLegacyBridge();
+    const state32 = bridge39.state;
+    if (activeBootstrapScope === scopeId) return;
+    activeBootstrapScope = scopeId;
+    bridge39.methods.revokeUploadPreviewUrls?.(state32.images);
+    state32.images = [];
+    state32.tasks = [];
+    state32.selectedTaskId = null;
+    state32.previewTask = null;
+    state32.pendingTaskId = null;
+    state32.taskSearchHistoryResultIds = [];
+    state32.expandedTaskGroupKey = null;
+    state32.tasksRenderKey = null;
+    state32.queue = { waiting: [], running: [], summary: { waiting_count: 0, running_count: 0, channel_count: 0 } };
+    state32.queueRenderKey = null;
+    bridge39.methods.renderImageStrip?.();
+    bridge39.methods.renderTasks?.();
+    bridge39.methods.renderArchiveButton?.();
+    bridge39.methods.renderArchiveModal?.();
+    bridge39.methods.renderPreview?.();
+    bridge39.methods.updateRequestPreview?.();
+  }
+  function initYuanshuModeFeature() {
+    installYuanshuPathRuntime();
+    applyYuanshuChrome();
     window.addEventListener("message", async (event) => {
       if (!isBootstrapMessage(event)) return;
       try {
-        await postYuanshuBootstrap(event.data.payload || {});
+        const bootstrap = await postYuanshuBootstrap(event.data.payload || {});
+        const userId = String(bootstrap?.yuanshu?.user_id || event.data.payload?.userId || "anonymous");
+        const keyId = String(bootstrap?.yuanshu?.key_id || event.data.payload?.keyId || "default");
+        const scopeId = `user:${userId}:key:${keyId}`;
+        setYuanshuSessionId(String(bootstrap?.yuanshu?.session_id || ""));
+        setYuanshuScopeId(scopeId);
+        resetYuanshuWorkspaceForScope(scopeId);
+        stopBootstrapReadyRetry();
         const bridge39 = getLegacyBridge();
         bridge39.state.authAvailable = true;
         bridge39.state.mode = "generate";
         bridge39.methods.setMode?.("generate");
         bridge39.methods.setStatus?.("\u5143\u67A2\u5728\u7EBF\u751F\u56FE\u5DF2\u5C31\u7EEA", "ok");
+        bridge39.methods.refreshTaskNotificationScope?.();
+        window.startRealtimeUpdates?.({ migrateLegacyArchives: false });
         await bridge39.methods.refreshHealth?.();
+        await bridge39.methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+        await window.refreshQueue?.();
       } catch (error) {
         const message = error instanceof Error ? error.message : "\u5143\u67A2\u5728\u7EBF\u751F\u56FE\u521D\u59CB\u5316\u5931\u8D25";
         getLegacyBridge().methods.setStatus?.(message, "error");
       }
     });
+    startBootstrapReadyRetry();
   }
 
   // codex_image/webui/frontend/src/main.ts
