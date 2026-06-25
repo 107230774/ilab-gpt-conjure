@@ -15,6 +15,11 @@ function currentAuthSource(): string { return legacyMethod("currentAuthSource");
 function currentApiMode(): string { return legacyMethod("currentApiMode"); }
 function currentCodexMode(): string { return legacyMethod("currentCodexMode"); }
 
+function isYuanshuShellMode(): boolean {
+  return document.documentElement.dataset.yuanshuMode === "true"
+    || window.location.pathname.startsWith("/image-playground");
+}
+
 export function setModeSpecificElementVisibility(element: any, visible: any): void {
   if (!element) return;
   element.setAttribute("aria-hidden", visible ? "false" : "true");
@@ -28,10 +33,14 @@ export function setModeSpecificElementVisibility(element: any, visible: any): vo
 }
 
 function applyModeSettingsVisibility(isDirectApi: any): void {
+  const yuanshuMode = isYuanshuShellMode();
   setModeSpecificElementVisibility(els.modeSpecificSettings, true);
-  setModeSpecificElementVisibility(els.mainModelField, !isDirectApi);
-  setModeSpecificElementVisibility(els.apiDirectSettingsNotice, isDirectApi);
+  setModeSpecificElementVisibility(els.mainModelField, !yuanshuMode && !isDirectApi);
+  setModeSpecificElementVisibility(els.apiDirectSettingsNotice, !yuanshuMode && isDirectApi);
+  setModeSpecificElementVisibility(els.webSearchField, !yuanshuMode);
   setModeSpecificElementVisibility(els.promptFidelityField, true);
+  els.modeSettingsSlot?.classList.toggle("is-yuanshu-compact", yuanshuMode);
+  els.modeSpecificSettings?.classList.toggle("is-yuanshu-compact", yuanshuMode);
 }
 
 function updateWebSearchAvailability(authSource: any = currentAuthSource()): void {

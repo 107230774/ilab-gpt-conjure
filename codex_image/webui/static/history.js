@@ -11929,6 +11929,7 @@
         aria-label="${escapeHtml(translate("history.openPreview"))}"
       >
         ${outputBadge}
+        <span class="history-image-loading-label" aria-hidden="true">\u56FE\u7247\u52A0\u8F7D\u4E2D</span>
         <img src="${escapeHtml(record.url)}" alt="" loading="lazy" decoding="async">
       </button>
       <div class="history-detail-image-actions" aria-label="${escapeHtml(translate("history.outputActions"))}">
@@ -12887,7 +12888,7 @@
       historyState.deleteConfirming = false;
       historyState.deleteConfirmTaskId = "";
       historyState.contextMenuDeleteConfirmKey = "";
-      if (els.taskList) els.taskList.innerHTML = "";
+      renderTaskListSkeleton();
       renderBulkToolbar();
     }
     setLoadMoreState(translate("history.loadingMore"), { busy: true });
@@ -13070,6 +13071,25 @@
     if (!els.taskList) return;
     els.taskList.innerHTML = `<div class="${className}">${escapeHtml2(message)}</div>`;
   }
+  function renderTaskListSkeleton(count = 8) {
+    if (!els.taskList) return;
+    syncHistoryViewMode();
+    els.taskList.innerHTML = Array.from({ length: count }, (_, index) => `
+    <article class="history-task-card history-task-skeleton" aria-hidden="true" style="--history-task-card-ratio: ${index % 3 === 0 ? "1.28" : index % 3 === 1 ? "0.78" : "1"}">
+      <span class="history-task-open">
+        <span class="history-task-thumb"></span>
+        <span class="history-task-copy">
+          <span class="history-skeleton-line history-skeleton-title"></span>
+          <span class="history-task-meta">
+            <span class="history-skeleton-line"></span>
+            <span class="history-skeleton-line short"></span>
+          </span>
+        </span>
+      </span>
+    </article>
+  `).join("");
+    layoutJustifiedHistoryGrid();
+  }
   function trimMountedTaskCards(edge) {
     if (!els.taskList) return;
     const cards = historyTaskCards(els.taskList);
@@ -13249,6 +13269,7 @@
   }
   async function loadTaskDetail(taskId) {
     if (!taskId) return;
+    const summary = historyTaskSummary(taskId);
     historyState.selectedTaskId = taskId;
     historyState.deleteConfirming = false;
     historyState.deleteConfirmTaskId = "";
@@ -13256,7 +13277,7 @@
     updateHistoryUrl();
     updateTaskSelectionVisuals(taskId);
     els.page?.classList.add("history-detail-open");
-    renderDetailShell(translate("history.loadingDetail"));
+    renderDetailLoading(taskId, summary);
     try {
       renderTaskDetail(await fetchHistoryTaskDetail(taskId));
     } catch (error) {
@@ -13280,6 +13301,32 @@
       <button id="historyDetailClose" class="drawer-close-button history-detail-close" type="button" data-history-detail-close aria-label="${escapeHtml2(translate("history.closeDetail"))}">\xD7</button>
     </div>
     <div class="${className}">${escapeHtml2(message)}</div>
+  `;
+  }
+  function renderDetailLoading(taskId, summary) {
+    if (!els.detail) return;
+    const title = detailTitle(summary || { task_id: taskId });
+    els.detail.innerHTML = `
+    <div class="history-detail-header">
+      <div>
+        <p class="history-detail-kicker">${escapeHtml2(translate("history.detail"))}</p>
+        <h2 class="history-detail-title">${escapeHtml2(title)}</h2>
+      </div>
+      <button id="historyDetailClose" class="drawer-close-button history-detail-close" type="button" data-history-detail-close aria-label="${escapeHtml2(translate("history.closeDetail"))}">\xD7</button>
+    </div>
+    <div class="history-detail-meta">
+      <span>${escapeHtml2(formatDate(summary?.created_at || ""))}</span>
+      <span>${escapeHtml2(summary?.status || "")}</span>
+      <span>${escapeHtml2(summary?.size || "")}</span>
+    </div>
+    <div class="history-detail-loading-card" aria-busy="true">
+      <div class="history-detail-image-preview">
+        <span class="history-image-loading-label">\u56FE\u7247\u52A0\u8F7D\u4E2D</span>
+      </div>
+      <div class="history-skeleton-line history-skeleton-title"></div>
+      <div class="history-skeleton-line"></div>
+      <div class="history-skeleton-line short"></div>
+    </div>
   `;
   }
   function historyTaskModeLabel(mode) {
@@ -14029,6 +14076,11 @@
   }
   function bindEvents() {
     bindHistoryResizerEvents();
+    document.addEventListener("load", (event) => {
+      const image = event.target instanceof HTMLImageElement ? event.target : null;
+      image?.closest(".history-detail-image-preview")?.classList.add("image-loaded");
+      image?.closest(".history-task-thumb")?.classList.add("image-loaded");
+    }, true);
     let searchTimer = 0;
     els.search?.addEventListener("input", () => {
       window.clearTimeout(searchTimer);
@@ -14264,12 +14316,13 @@
     restoreHistoryLayoutPreference();
     syncStateFromUrl();
     initSegmentedIndicatorFeature();
-    renderDetailShell(translate("history.detailEmpty"));
     bindEvents();
     await loadSummary();
     await loadTasks({ reset: true });
     if (historyState.selectedTaskId) {
       void loadTaskDetail(historyState.selectedTaskId);
+    } else {
+      renderDetailShell(translate("history.detailEmpty"));
     }
   }
   void bootHistoryPage();

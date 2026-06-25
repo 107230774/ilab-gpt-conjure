@@ -236,15 +236,17 @@ function renderOutputPreview(task: any, { running = false, failure = false, wait
   const hasStatusCard = running || failure || waiting;
   const totalCount = hasStatusCard ? taskTotalCount(task) : outputUrls.length;
   const itemCount = outputUrls.length + (hasStatusCard ? 1 : 0);
-  const previousOutputCount = currentPreviewOutputCardCount();
-  const preservePreviousImages = previousOutputCount === outputUrls.length;
-  const shouldDeferLayoutSwitch = !preservePreviousImages && outputUrls.length > 0;
-  if (shouldDeferLayoutSwitch) {
-    scheduleDeferredPreviewRender(task, { running, failure, waiting, outputUrls, totalCount, itemCount });
-    return;
-  }
   pendingPreviewRenderToken += 1;
-  commitOutputPreviewRender(task, { running, failure, waiting, outputUrls, totalCount, itemCount, preservePreviousImages });
+  commitOutputPreviewRender(task, {
+    running,
+    failure,
+    waiting,
+    outputUrls,
+    totalCount,
+    itemCount,
+    preservePreviousImages: currentPreviewOutputCardCount() === outputUrls.length,
+    imageAlreadyLoaded: false,
+  });
 }
 
 function commitOutputPreviewRender(task: any, { running = false, failure = false, waiting = false, outputUrls, totalCount, itemCount, preservePreviousImages = true, imageAlreadyLoaded = false }: any) {
@@ -319,6 +321,7 @@ function ensurePreviewOutputCard(key: string) {
       <span class="preview-select-label" data-preview-select-label data-i18n="preview.featured">${featuredLabel}</span>
     </button>
     <img alt="" data-lightbox-url="">
+    <span class="preview-image-loading" aria-hidden="true">图片加载中</span>
     <div class="preview-overlay">
        <div class="prompt-action-row">
          <button type="button" class="add-to-input-btn" data-add-input-url="" aria-label="${addReferenceLabel}" data-i18n="preview.addReference" data-i18n-attr="aria-label:preview.addReference">${addReferenceLabel}</button>
@@ -329,7 +332,14 @@ function ensurePreviewOutputCard(key: string) {
     </div>
   `;
   const image = card.querySelector("img");
-  image?.addEventListener("load", syncPreviewImageOrientation);
+  image?.addEventListener("load", () => {
+    card.classList.remove("is-loading-next");
+    syncPreviewImageOrientation();
+  });
+  image?.addEventListener("error", () => {
+    card.classList.remove("is-loading-next");
+    card.classList.add("is-load-failed");
+  });
   return card;
 }
 
@@ -398,6 +408,8 @@ function updatePreviewImage(card: HTMLElement, url: string, { preservePreviousIm
   const token = `${url}:${Date.now()}:${Math.random()}`;
   card.dataset.previewImageToken = token;
   card.dataset.previewPendingUrl = url;
+  card.classList.add("is-loading-next");
+  card.classList.remove("is-load-failed");
   if (imageAlreadyLoaded) {
     commitPreviewImageUrl(card, visibleImage, url, token);
     return;
@@ -409,14 +421,7 @@ function updatePreviewImage(card: HTMLElement, url: string, { preservePreviousIm
   if (!preservePreviousImage) {
     clearPreviewImageBeforeLoad(visibleImage);
   }
-  card.classList.add("is-loading-next");
-  void preloadPreviewImage(url).then((loaded) => {
-    if (!loaded) {
-      cancelPreviewImagePending(card, token);
-      return;
-    }
-    commitPreviewImageUrl(card, visibleImage, url, token);
-  });
+  commitPreviewImageUrl(card, visibleImage, url, token);
 }
 
 function commitPreviewImageUrl(card: HTMLElement, visibleImage: HTMLImageElement, url: string, token: string) {
@@ -425,8 +430,10 @@ function commitPreviewImageUrl(card: HTMLElement, visibleImage: HTMLImageElement
   visibleImage.hidden = false;
   visibleImage.dataset.lightboxUrl = url;
   delete card.dataset.previewPendingUrl;
-  card.classList.remove("is-loading-next");
-  if (visibleImage.complete) window.requestAnimationFrame(syncPreviewImageOrientation);
+  if (visibleImage.complete && visibleImage.naturalWidth > 0) {
+    card.classList.remove("is-loading-next");
+    window.requestAnimationFrame(syncPreviewImageOrientation);
+  }
 }
 
 function clearPreviewImageBeforeLoad(visibleImage: HTMLImageElement) {

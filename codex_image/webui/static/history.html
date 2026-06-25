@@ -97,7 +97,44 @@
           <button id="historyBulkDeleteCancelButton" class="ghost-button text-sm hidden" type="button" data-i18n="action.cancel">取消</button>
         </div>
       </div>
-      <div id="historyTaskList" class="history-task-list history-view-grid" role="listbox" aria-live="polite"></div>
+      <div id="historyTaskList" class="history-task-list history-view-grid" role="listbox" aria-live="polite">
+        <article class="history-task-card history-task-skeleton" aria-hidden="true" style="--history-task-card-ratio: 1.28">
+          <span class="history-task-open">
+            <span class="history-task-thumb"></span>
+            <span class="history-task-copy">
+              <span class="history-skeleton-line history-skeleton-title"></span>
+              <span class="history-task-meta">
+                <span class="history-skeleton-line"></span>
+                <span class="history-skeleton-line short"></span>
+              </span>
+            </span>
+          </span>
+        </article>
+        <article class="history-task-card history-task-skeleton" aria-hidden="true" style="--history-task-card-ratio: 0.78">
+          <span class="history-task-open">
+            <span class="history-task-thumb"></span>
+            <span class="history-task-copy">
+              <span class="history-skeleton-line history-skeleton-title"></span>
+              <span class="history-task-meta">
+                <span class="history-skeleton-line"></span>
+                <span class="history-skeleton-line short"></span>
+              </span>
+            </span>
+          </span>
+        </article>
+        <article class="history-task-card history-task-skeleton" aria-hidden="true" style="--history-task-card-ratio: 1">
+          <span class="history-task-open">
+            <span class="history-task-thumb"></span>
+            <span class="history-task-copy">
+              <span class="history-skeleton-line history-skeleton-title"></span>
+              <span class="history-task-meta">
+                <span class="history-skeleton-line"></span>
+                <span class="history-skeleton-line short"></span>
+              </span>
+            </span>
+          </span>
+        </article>
+      </div>
       <div id="historyLoadSentinel" class="history-load-sentinel" data-history-load-more role="status" aria-live="polite" hidden></div>
     </section>
     <div class="history-resizer history-resizer-right" role="separator" tabindex="0" aria-orientation="vertical" aria-valuemin="300" aria-valuemax="620" aria-valuenow="380" aria-label="调整详情栏宽度" data-history-resizer="right" data-i18n-attr="aria-label:history.resizeDetail"></div>
@@ -109,7 +146,14 @@
         </div>
         <button id="historyDetailClose" class="drawer-close-button history-detail-close" type="button" data-history-detail-close aria-label="关闭任务详情" data-i18n-attr="aria-label:history.closeDetail">×</button>
       </div>
-      <div class="history-detail-empty" data-i18n="history.detailEmpty">选择一个历史任务查看详情</div>
+      <div class="history-detail-loading-card" aria-hidden="true">
+        <div class="history-detail-image-preview">
+          <span class="history-image-loading-label">图片加载中</span>
+        </div>
+        <div class="history-skeleton-line history-skeleton-title"></div>
+        <div class="history-skeleton-line"></div>
+        <div class="history-skeleton-line short"></div>
+      </div>
     </aside>
   </main>
   <script src="/image-playground/static/history.js?v=history-32"></script>

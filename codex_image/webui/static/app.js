@@ -28798,6 +28798,9 @@ ${hint}` : hint;
   function currentCodexMode() {
     return legacyMethod11("currentCodexMode");
   }
+  function isYuanshuShellMode() {
+    return document.documentElement.dataset.yuanshuMode === "true" || window.location.pathname.startsWith("/image-playground");
+  }
   function setModeSpecificElementVisibility(element2, visible) {
     if (!element2) return;
     element2.setAttribute("aria-hidden", visible ? "false" : "true");
@@ -28810,10 +28813,14 @@ ${hint}` : hint;
     element2.classList.add("hidden");
   }
   function applyModeSettingsVisibility(isDirectApi) {
+    const yuanshuMode = isYuanshuShellMode();
     setModeSpecificElementVisibility(els8.modeSpecificSettings, true);
-    setModeSpecificElementVisibility(els8.mainModelField, !isDirectApi);
-    setModeSpecificElementVisibility(els8.apiDirectSettingsNotice, isDirectApi);
+    setModeSpecificElementVisibility(els8.mainModelField, !yuanshuMode && !isDirectApi);
+    setModeSpecificElementVisibility(els8.apiDirectSettingsNotice, !yuanshuMode && isDirectApi);
+    setModeSpecificElementVisibility(els8.webSearchField, !yuanshuMode);
     setModeSpecificElementVisibility(els8.promptFidelityField, true);
+    els8.modeSettingsSlot?.classList.toggle("is-yuanshu-compact", yuanshuMode);
+    els8.modeSpecificSettings?.classList.toggle("is-yuanshu-compact", yuanshuMode);
   }
   function updateWebSearchAvailability(authSource = currentAuthSource()) {
     const supported = authSource === "api" ? currentApiMode() === "responses" : authSource === "codex" ? currentCodexMode() === "responses" : true;
@@ -39887,23 +39894,6 @@ ${galleryText}`;
     const marker = "__CODEX_IMAGE_ELAPSED_TIMER__";
     return formatTranslation(key, { ...values, elapsed: marker }).split(marker).map((part) => escapeHtml19(part)).join(elapsedHtml);
   }
-  function scheduleDeferredPreviewRender(task, { running, failure, waiting, outputUrls, totalCount, itemCount }) {
-    const renderToken = ++pendingPreviewRenderToken;
-    void (async () => {
-      const allImagesLoaded = await preloadPreviewImages(outputUrls);
-      if (renderToken !== pendingPreviewRenderToken) return;
-      commitOutputPreviewRender(task, {
-        running,
-        failure,
-        waiting,
-        outputUrls,
-        totalCount,
-        itemCount,
-        preservePreviousImages: false,
-        imageAlreadyLoaded: allImagesLoaded
-      });
-    })();
-  }
   function cancelDeferredPreviewRender() {
     pendingPreviewRenderToken += 1;
   }
@@ -39912,15 +39902,17 @@ ${galleryText}`;
     const hasStatusCard = running || failure || waiting;
     const totalCount = hasStatusCard ? taskTotalCount2(task) : outputUrls.length;
     const itemCount = outputUrls.length + (hasStatusCard ? 1 : 0);
-    const previousOutputCount = currentPreviewOutputCardCount();
-    const preservePreviousImages = previousOutputCount === outputUrls.length;
-    const shouldDeferLayoutSwitch = !preservePreviousImages && outputUrls.length > 0;
-    if (shouldDeferLayoutSwitch) {
-      scheduleDeferredPreviewRender(task, { running, failure, waiting, outputUrls, totalCount, itemCount });
-      return;
-    }
     pendingPreviewRenderToken += 1;
-    commitOutputPreviewRender(task, { running, failure, waiting, outputUrls, totalCount, itemCount, preservePreviousImages });
+    commitOutputPreviewRender(task, {
+      running,
+      failure,
+      waiting,
+      outputUrls,
+      totalCount,
+      itemCount,
+      preservePreviousImages: currentPreviewOutputCardCount() === outputUrls.length,
+      imageAlreadyLoaded: false
+    });
   }
   function commitOutputPreviewRender(task, { running = false, failure = false, waiting = false, outputUrls, totalCount, itemCount, preservePreviousImages = true, imageAlreadyLoaded = false }) {
     applyPreviewGridLayout(totalCount, itemCount);
@@ -39989,6 +39981,7 @@ ${galleryText}`;
       <span class="preview-select-label" data-preview-select-label data-i18n="preview.featured">${featuredLabel}</span>
     </button>
     <img alt="" data-lightbox-url="">
+    <span class="preview-image-loading" aria-hidden="true">\u56FE\u7247\u52A0\u8F7D\u4E2D</span>
     <div class="preview-overlay">
        <div class="prompt-action-row">
          <button type="button" class="add-to-input-btn" data-add-input-url="" aria-label="${addReferenceLabel}" data-i18n="preview.addReference" data-i18n-attr="aria-label:preview.addReference">${addReferenceLabel}</button>
@@ -39999,7 +39992,14 @@ ${galleryText}`;
     </div>
   `;
     const image = card.querySelector("img");
-    image?.addEventListener("load", syncPreviewImageOrientation);
+    image?.addEventListener("load", () => {
+      card.classList.remove("is-loading-next");
+      syncPreviewImageOrientation();
+    });
+    image?.addEventListener("error", () => {
+      card.classList.remove("is-loading-next");
+      card.classList.add("is-load-failed");
+    });
     return card;
   }
   function updatePreviewOutputCard(card, task, url, index, totalCount, { preservePreviousImage = true, imageAlreadyLoaded = false } = {}) {
@@ -40065,6 +40065,8 @@ ${galleryText}`;
     const token = `${url}:${Date.now()}:${Math.random()}`;
     card.dataset.previewImageToken = token;
     card.dataset.previewPendingUrl = url;
+    card.classList.add("is-loading-next");
+    card.classList.remove("is-load-failed");
     if (imageAlreadyLoaded) {
       commitPreviewImageUrl(card, visibleImage, url, token);
       return;
@@ -40076,14 +40078,7 @@ ${galleryText}`;
     if (!preservePreviousImage) {
       clearPreviewImageBeforeLoad(visibleImage);
     }
-    card.classList.add("is-loading-next");
-    void preloadPreviewImage(url).then((loaded) => {
-      if (!loaded) {
-        cancelPreviewImagePending(card, token);
-        return;
-      }
-      commitPreviewImageUrl(card, visibleImage, url, token);
-    });
+    commitPreviewImageUrl(card, visibleImage, url, token);
   }
   function commitPreviewImageUrl(card, visibleImage, url, token) {
     if (!card.isConnected || card.dataset.previewImageToken !== token) return;
@@ -40091,41 +40086,15 @@ ${galleryText}`;
     visibleImage.hidden = false;
     visibleImage.dataset.lightboxUrl = url;
     delete card.dataset.previewPendingUrl;
-    card.classList.remove("is-loading-next");
-    if (visibleImage.complete) window.requestAnimationFrame(syncPreviewImageOrientation);
+    if (visibleImage.complete && visibleImage.naturalWidth > 0) {
+      card.classList.remove("is-loading-next");
+      window.requestAnimationFrame(syncPreviewImageOrientation);
+    }
   }
   function clearPreviewImageBeforeLoad(visibleImage) {
     visibleImage.hidden = true;
     visibleImage.removeAttribute("src");
     visibleImage.dataset.lightboxUrl = "";
-  }
-  function cancelPreviewImagePending(card, token) {
-    if (!card.isConnected || card.dataset.previewImageToken !== token) return;
-    delete card.dataset.previewPendingUrl;
-    card.classList.remove("is-loading-next");
-  }
-  async function preloadPreviewImage(url) {
-    const image = document.createElement("img");
-    const loadedPromise = waitForPreviewImageLoad(image);
-    image.decoding = "async";
-    image.src = url;
-    const loaded = image.complete && image.naturalWidth > 0 ? true : await loadedPromise;
-    if (!loaded) return false;
-    try {
-      await image.decode?.();
-    } catch {
-    }
-    return true;
-  }
-  async function preloadPreviewImages(outputUrls) {
-    const results = await Promise.all(outputUrls.map((url) => preloadPreviewImage(String(url || ""))));
-    return results.every(Boolean);
-  }
-  function waitForPreviewImageLoad(image) {
-    return new Promise((resolve) => {
-      image.onload = () => resolve(true);
-      image.onerror = () => resolve(false);
-    });
   }
   function reconcilePreviewStatusCard(task, flags, visibleOutputCount) {
     const existing = els37.previewGrid.querySelector("[data-preview-status-card]");

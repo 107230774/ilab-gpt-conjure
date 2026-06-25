@@ -754,7 +754,7 @@ async function loadTasks({ reset = false, direction = "next" }: { reset?: boolea
     historyState.deleteConfirming = false;
     historyState.deleteConfirmTaskId = "";
     historyState.contextMenuDeleteConfirmKey = "";
-    if (els.taskList) els.taskList.innerHTML = "";
+    renderTaskListSkeleton();
     renderBulkToolbar();
   }
   setLoadMoreState(translate("history.loadingMore"), { busy: true });
@@ -951,6 +951,26 @@ function upsertHistoryTaskSummaryCard(taskId: string, task: any): void {
 function renderTaskListMessage(className: string, message: string): void {
   if (!els.taskList) return;
   els.taskList.innerHTML = `<div class="${className}">${escapeHtml(message)}</div>`;
+}
+
+function renderTaskListSkeleton(count = 8): void {
+  if (!els.taskList) return;
+  syncHistoryViewMode();
+  els.taskList.innerHTML = Array.from({ length: count }, (_, index) => `
+    <article class="history-task-card history-task-skeleton" aria-hidden="true" style="--history-task-card-ratio: ${index % 3 === 0 ? "1.28" : index % 3 === 1 ? "0.78" : "1"}">
+      <span class="history-task-open">
+        <span class="history-task-thumb"></span>
+        <span class="history-task-copy">
+          <span class="history-skeleton-line history-skeleton-title"></span>
+          <span class="history-task-meta">
+            <span class="history-skeleton-line"></span>
+            <span class="history-skeleton-line short"></span>
+          </span>
+        </span>
+      </span>
+    </article>
+  `).join("");
+  layoutJustifiedHistoryGrid();
 }
 
 function trimMountedTaskCards(edge: HistoryWindowEdge): void {
@@ -1150,6 +1170,7 @@ function handleHistoryTaskShortcutSelection(taskId: string, event: MouseEvent | 
 
 async function loadTaskDetail(taskId: string): Promise<void> {
   if (!taskId) return;
+  const summary = historyTaskSummary(taskId);
   historyState.selectedTaskId = taskId;
   historyState.deleteConfirming = false;
   historyState.deleteConfirmTaskId = "";
@@ -1157,7 +1178,7 @@ async function loadTaskDetail(taskId: string): Promise<void> {
   updateHistoryUrl();
   updateTaskSelectionVisuals(taskId);
   els.page?.classList.add("history-detail-open");
-  renderDetailShell(translate("history.loadingDetail"));
+  renderDetailLoading(taskId, summary);
   try {
     renderTaskDetail(await fetchHistoryTaskDetail(taskId));
   } catch (error) {
@@ -1183,6 +1204,33 @@ function renderDetailShell(message: string, className = "history-detail-empty"):
       <button id="historyDetailClose" class="drawer-close-button history-detail-close" type="button" data-history-detail-close aria-label="${escapeHtml(translate("history.closeDetail"))}">×</button>
     </div>
     <div class="${className}">${escapeHtml(message)}</div>
+  `;
+}
+
+function renderDetailLoading(taskId: string, summary: HistoryTask | null): void {
+  if (!els.detail) return;
+  const title = detailTitle(summary || { task_id: taskId });
+  els.detail.innerHTML = `
+    <div class="history-detail-header">
+      <div>
+        <p class="history-detail-kicker">${escapeHtml(translate("history.detail"))}</p>
+        <h2 class="history-detail-title">${escapeHtml(title)}</h2>
+      </div>
+      <button id="historyDetailClose" class="drawer-close-button history-detail-close" type="button" data-history-detail-close aria-label="${escapeHtml(translate("history.closeDetail"))}">×</button>
+    </div>
+    <div class="history-detail-meta">
+      <span>${escapeHtml(formatDate(summary?.created_at || ""))}</span>
+      <span>${escapeHtml(summary?.status || "")}</span>
+      <span>${escapeHtml(summary?.size || "")}</span>
+    </div>
+    <div class="history-detail-loading-card" aria-busy="true">
+      <div class="history-detail-image-preview">
+        <span class="history-image-loading-label">图片加载中</span>
+      </div>
+      <div class="history-skeleton-line history-skeleton-title"></div>
+      <div class="history-skeleton-line"></div>
+      <div class="history-skeleton-line short"></div>
+    </div>
   `;
 }
 
@@ -2005,6 +2053,11 @@ function closeDetail(): void {
 
 function bindEvents(): void {
   bindHistoryResizerEvents();
+  document.addEventListener("load", (event) => {
+    const image = event.target instanceof HTMLImageElement ? event.target : null;
+    image?.closest(".history-detail-image-preview")?.classList.add("image-loaded");
+    image?.closest(".history-task-thumb")?.classList.add("image-loaded");
+  }, true);
   let searchTimer = 0;
   els.search?.addEventListener("input", () => {
     window.clearTimeout(searchTimer);
@@ -2246,12 +2299,13 @@ async function bootHistoryPage(): Promise<void> {
   restoreHistoryLayoutPreference();
   syncStateFromUrl();
   initSegmentedIndicatorFeature();
-  renderDetailShell(translate("history.detailEmpty"));
   bindEvents();
   await loadSummary();
   await loadTasks({ reset: true });
   if (historyState.selectedTaskId) {
     void loadTaskDetail(historyState.selectedTaskId);
+  } else {
+    renderDetailShell(translate("history.detailEmpty"));
   }
 }
 

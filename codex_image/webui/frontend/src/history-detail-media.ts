@@ -188,6 +188,7 @@ function historyDetailImageHtml(
         aria-label="${escapeHtml(translate("history.openPreview"))}"
       >
         ${outputBadge}
+        <span class="history-image-loading-label" aria-hidden="true">图片加载中</span>
         <img src="${escapeHtml(record.url)}" alt="" loading="lazy" decoding="async">
       </button>
       <div class="history-detail-image-actions" aria-label="${escapeHtml(translate("history.outputActions"))}">
