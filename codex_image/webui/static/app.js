@@ -33754,7 +33754,7 @@ ${galleryText}`;
   function currentQuantity() {
     const value = Number.parseInt(els23.nInput?.value || "1", 10);
     if (Number.isNaN(value)) return 1;
-    return Math.min(4, Math.max(1, value));
+    return Math.min(2, Math.max(1, value));
   }
   function updateQuantity() {
     if (!els23.nInput) return;

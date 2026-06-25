@@ -111,10 +111,10 @@ def metadata_matches_current_yuanshu_owner(ctx: WebUIContext, metadata: dict[str
     task_owner = metadata.get(YUANSHU_OWNER_KEY)
     if not isinstance(task_owner, dict):
         return False
-    return (
-        str(task_owner.get("user_id") or "") == str(owner.get("user_id") or "")
-        and str(task_owner.get("key_id") or "") == str(owner.get("key_id") or "")
-    )
+    owner_user_id = str(owner.get("user_id") or "")
+    if not owner_user_id:
+        return False
+    return str(task_owner.get("user_id") or "") == owner_user_id
 
 
 def filter_current_yuanshu_tasks(ctx: WebUIContext, tasks: list[dict[str, Any]], request: Request | None = None) -> list[dict[str, Any]]:

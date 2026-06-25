@@ -227,10 +227,10 @@ def _reference_asset_matches_current_owner(item: Any, ctx: WebUIContext, request
 
 
 def _owner_matches(candidate: dict[str, Any], owner: dict[str, Any]) -> bool:
-    return (
-        str(candidate.get("user_id") or "") == str(owner.get("user_id") or "")
-        and str(candidate.get("key_id") or "") == str(owner.get("key_id") or "")
-    )
+    owner_user_id = str(owner.get("user_id") or "")
+    if not owner_user_id:
+        return False
+    return str(candidate.get("user_id") or "") == owner_user_id
 
 
 def _current_owner_reference_asset_ids(ctx: WebUIContext, request: Request) -> set[str]:

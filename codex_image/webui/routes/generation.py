@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -18,15 +19,107 @@ from codex_image.webui.executor import (
 )
 from codex_image.webui.prompt_ratio import append_ratio_prompt_instruction
 from codex_image.webui.storage import utc_now
-from codex_image.webui.task_metadata import _dedupe_preserve_order, _params, _with_file_urls, _write_queued_metadata
-from codex_image.webui.yuanshu_scope import current_yuanshu_session, stamp_current_yuanshu_owner
+from codex_image.webui.task_metadata import _dedupe_preserve_order, _params, _reference_asset_response, _with_file_urls, _write_queued_metadata
+from codex_image.webui.yuanshu_scope import current_yuanshu_owner_for_request, current_yuanshu_session, stamp_current_yuanshu_owner
 from codex_image.webui.yuanshu import verify_yuanshu_token
 
 DEFAULT_PROMPT_FIDELITY = "strict"
+YUANSHU_ALLOWED_RESOLUTIONS = {"auto", "standard", "2k"}
+YUANSHU_ALLOWED_SIZES = {
+    "auto",
+    "1024x1024",
+    "1024x1280",
+    "1280x1024",
+    "1152x1536",
+    "1536x1152",
+    "1024x1536",
+    "1536x1024",
+    "864x1536",
+    "1536x864",
+    "672x1568",
+    "1568x672",
+    "2048x2048",
+    "1600x2000",
+    "2000x1600",
+    "1536x2048",
+    "2048x1536",
+    "1344x2016",
+    "2016x1344",
+    "1152x2048",
+    "2048x1152",
+    "1152x2688",
+    "2688x1152",
+}
 
 
 def _is_yuanshu_request(api_provider_id: str | None, api_mode: str | None) -> bool:
     return str(api_provider_id or "").strip().lower() == "yuanshu" or str(api_mode or "").strip().lower() == "yuanshu"
+
+
+async def _verify_yuanshu_session_token(yuanshu_session: dict[str, Any], ctx: WebUIContext) -> None:
+    try:
+        await asyncio.to_thread(
+            verify_yuanshu_token,
+            str(yuanshu_session.get("token") or ""),
+            server_api_base=str(yuanshu_session.get("server_api_base") or ctx.yuanshu.server_api_base),
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+def _enforce_yuanshu_generation_limits(size: str, resolution: str | None, n: int) -> tuple[str, str | None, int]:
+    clean_size = str(size or "auto").strip().lower() or "auto"
+    clean_resolution = str(resolution or "").strip().lower()
+    try:
+        clean_n = int(n)
+    except (TypeError, ValueError):
+        clean_n = 1
+    if clean_n < 1 or clean_n > 2:
+        raise HTTPException(status_code=400, detail="Yuanshu mode supports at most 2 images per task")
+    if clean_resolution and clean_resolution not in YUANSHU_ALLOWED_RESOLUTIONS:
+        raise HTTPException(status_code=400, detail="This image resolution is not enabled in Yuanshu mode")
+    if clean_size not in YUANSHU_ALLOWED_SIZES:
+        raise HTTPException(status_code=400, detail="This image size is not enabled in Yuanshu mode")
+    return clean_size, (clean_resolution or resolution), clean_n
+
+
+def _owner_matches_current_user(candidate: dict[str, Any], owner: dict[str, Any]) -> bool:
+    return str(candidate.get("user_id") or "") == str(owner.get("user_id") or "")
+
+
+def _reference_asset_matches_current_owner(item: dict[str, Any], owner: dict[str, Any]) -> bool:
+    candidates: list[dict[str, Any]] = []
+    legacy_owner = item.get("yuanshu_owner")
+    if isinstance(legacy_owner, dict):
+        candidates.append(legacy_owner)
+    owners = item.get("yuanshu_owners")
+    if isinstance(owners, list):
+        candidates.extend(candidate for candidate in owners if isinstance(candidate, dict))
+    return any(_owner_matches_current_user(candidate, owner) for candidate in candidates)
+
+
+def _resolve_owned_reference_assets(ctx: WebUIContext, request: Request, asset_ids: list[str]) -> tuple[list[dict[str, Any]], list[str]]:
+    owner = current_yuanshu_owner_for_request(ctx, request)
+    if owner is None:
+        return _resolve_reference_assets(ctx.reference_asset_storage, asset_ids)
+    refs: list[dict[str, Any]] = []
+    data_urls: list[str] = []
+    for asset_id in _dedupe_preserve_order(asset_ids):
+        try:
+            item = ctx.reference_asset_storage.read_item(asset_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid reference asset id: {asset_id}") from exc
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=f"Reference asset not found: {asset_id}") from exc
+        if not _reference_asset_matches_current_owner(item, owner):
+            raise HTTPException(status_code=404, detail=f"Reference asset not found: {asset_id}")
+        item = ctx.reference_asset_storage.touch(asset_id)
+        path = ctx.reference_asset_storage.image_path(asset_id)
+        refs.append(_reference_asset_response(item))
+        data_urls.append(_file_to_data_url(path, mime_type=str(item.get("mime_type") or "")))
+    return refs, data_urls
 
 
 def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
@@ -64,19 +157,12 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
         if yuanshu_session is None and not ctx.auth_checker():
             raise HTTPException(status_code=401, detail="Codex auth is not available")
         if yuanshu_session is not None:
-            try:
-                verify_yuanshu_token(
-                    str(yuanshu_session.get("token") or ""),
-                    server_api_base=str(yuanshu_session.get("server_api_base") or ctx.yuanshu.server_api_base),
-                )
-            except PermissionError as exc:
-                raise HTTPException(status_code=401, detail=str(exc)) from exc
-            except Exception as exc:
-                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            await _verify_yuanshu_session_token(yuanshu_session, ctx)
+            size, resolution, n = _enforce_yuanshu_generation_limits(size, resolution, n)
 
         gallery_refs, gallery_data_urls = _resolve_gallery_refs(ctx.gallery_storage, gallery_image_ids or [])
         uploaded_assets = await h["save_reference_assets"](reference_images or [], request=request)
-        selected_assets, _ = _resolve_reference_assets(ctx.reference_asset_storage, reference_asset_ids or [])
+        selected_assets, _ = _resolve_owned_reference_assets(ctx, request, reference_asset_ids or [])
         reference_assets = h["dedupe_reference_assets"](uploaded_assets + selected_assets)
         task = ctx.storage.create_task("generate")
         created_at = utc_now()
@@ -233,15 +319,8 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
         if yuanshu_session is None and not ctx.auth_checker():
             raise HTTPException(status_code=401, detail="Codex auth is not available")
         if yuanshu_session is not None:
-            try:
-                verify_yuanshu_token(
-                    str(yuanshu_session.get("token") or ""),
-                    server_api_base=str(yuanshu_session.get("server_api_base") or ctx.yuanshu.server_api_base),
-                )
-            except PermissionError as exc:
-                raise HTTPException(status_code=401, detail=str(exc)) from exc
-            except Exception as exc:
-                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            await _verify_yuanshu_session_token(yuanshu_session, ctx)
+            raise HTTPException(status_code=403, detail="Image edit is not enabled in Yuanshu mode")
 
         if not images and not _dedupe_preserve_order(gallery_image_ids or []) and not _dedupe_preserve_order(reference_asset_ids or []):
             raise HTTPException(status_code=400, detail="At least one image is required")

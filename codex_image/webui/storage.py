@@ -147,24 +147,30 @@ class TaskStorage:
             return []
         return self.rebuild_task_index()
 
-    def list_recent_tasks(self, limit: int = 200) -> list[dict[str, Any]]:
-        indexed_tasks = self.task_index.list_summaries(limit=limit)
+    def list_recent_tasks(self, limit: int = 200, *, yuanshu_user_id: str = "") -> list[dict[str, Any]]:
+        indexed_tasks = self.task_index.list_summaries(limit=limit, yuanshu_user_id=yuanshu_user_id)
         if indexed_tasks:
             return indexed_tasks
-        return self.rebuild_task_index()[: max(0, limit)]
+        tasks = self.rebuild_task_index()
+        if yuanshu_user_id:
+            tasks = [task for task in tasks if _metadata_yuanshu_user_id(task) == str(yuanshu_user_id)]
+        return tasks[: max(0, limit)]
 
-    def list_recent_task_cards(self, limit: int = 200) -> list[dict[str, Any]]:
-        indexed_tasks = self.task_index.list_summaries(limit=limit)
+    def list_recent_task_cards(self, limit: int = 200, *, yuanshu_user_id: str = "") -> list[dict[str, Any]]:
+        indexed_tasks = self.task_index.list_summaries(limit=limit, yuanshu_user_id=yuanshu_user_id)
         if not indexed_tasks:
-            indexed_tasks = self.rebuild_task_index()[: max(0, limit)]
+            indexed_tasks = self.rebuild_task_index()
+            if yuanshu_user_id:
+                indexed_tasks = [task for task in indexed_tasks if _metadata_yuanshu_user_id(task) == str(yuanshu_user_id)]
+            indexed_tasks = indexed_tasks[: max(0, limit)]
         return [_sidebar_task_card(task) for task in indexed_tasks]
 
     def task_sidebar_card(self, task_id: str) -> dict[str, Any]:
         return _sidebar_task_card(self.read_metadata(task_id))
 
-    def task_history_summary(self) -> dict[str, Any]:
+    def task_history_summary(self, *, yuanshu_user_id: str = "") -> dict[str, Any]:
         self.refresh_stale_task_index()
-        return self.task_index.history_summary()
+        return self.task_index.history_summary(yuanshu_user_id=yuanshu_user_id)
 
     def query_task_history(
         self,
@@ -184,6 +190,7 @@ class TaskStorage:
         archived: bool | None = None,
         sort: str = "newest",
         direction: str = "next",
+        yuanshu_user_id: str = "",
     ) -> dict[str, Any]:
         self.refresh_stale_task_index()
         return self.task_index.query_history(
@@ -202,6 +209,7 @@ class TaskStorage:
             archived=archived,
             sort=sort,
             direction=direction,
+            yuanshu_user_id=yuanshu_user_id,
         )
 
     def refresh_stale_task_index(self, *, limit: int = 500) -> int:
@@ -393,6 +401,13 @@ class TaskStorage:
             (self.source_data_root / TASK_SOURCE_DATA_SUBDIR).rmdir()
         except OSError:
             pass
+
+
+def _metadata_yuanshu_user_id(metadata: dict[str, Any]) -> str:
+    owner = metadata.get("yuanshu_owner")
+    if not isinstance(owner, dict):
+        return ""
+    return str(owner.get("user_id") or "").strip()
 
 
 def _sidebar_task_card(metadata: dict[str, Any]) -> dict[str, Any]:

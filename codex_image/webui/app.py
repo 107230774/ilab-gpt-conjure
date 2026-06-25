@@ -4,13 +4,14 @@ import base64
 from io import BytesIO
 import json
 import mimetypes
+import os
 import zipfile
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote, urlsplit
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from codex_image.client import (
@@ -183,6 +184,44 @@ class NoCacheStaticFiles(StaticFiles):
         return response
 
 
+def _yuanshu_public_mode_enabled() -> bool:
+    raw = os.getenv("YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE", "true").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _normalize_yuanshu_api_path(path: str) -> str:
+    value = str(path or "")
+    if value.startswith("/image-playground/api/"):
+        return value.removeprefix("/image-playground")
+    return value
+
+
+def _yuanshu_public_api_blocked(method: str, path: str) -> bool:
+    normalized = _normalize_yuanshu_api_path(path)
+    verb = str(method or "").upper()
+    if normalized in {"/api/settings", "/api/api-settings"}:
+        return True
+    if normalized == "/api/auth" and verb in {"PATCH", "POST", "PUT", "DELETE"}:
+        return True
+    if normalized == "/api/app-version/open-updater":
+        return True
+    if normalized == "/api/color-palette" and verb in {"PATCH", "POST", "PUT", "DELETE"}:
+        return True
+    if normalized.startswith("/api/color-palette/import") and verb == "POST":
+        return True
+    if normalized.startswith("/api/gallery") and verb in {"POST", "PATCH", "PUT", "DELETE"}:
+        return True
+    if normalized.startswith("/api/prompt-snippets") and verb in {"POST", "PATCH", "PUT", "DELETE"}:
+        return True
+    if normalized.startswith("/api/prompt-templates") and verb in {"POST", "PATCH", "PUT", "DELETE"}:
+        return True
+    if normalized.startswith("/api/prompt-template-categories") and verb in {"POST", "PATCH", "PUT", "DELETE"}:
+        return True
+    if normalized.startswith("/api/tasks/") and normalized.endswith("/reveal-output") and verb == "POST":
+        return True
+    return False
+
+
 def create_app(
     *,
     input_root: Path | str | None = None,
@@ -242,8 +281,14 @@ def create_app(
 
     @app.middleware("http")
     async def no_store_yuanshu_dynamic_responses(request: Request, call_next: Callable[[Request], Any]) -> Response:
-        response = await call_next(request)
         path = request.url.path
+        if _yuanshu_public_mode_enabled() and _yuanshu_public_api_blocked(request.method, path):
+            return JSONResponse(
+                {"detail": "This management operation is disabled in Yuanshu public mode"},
+                status_code=403,
+                headers={"Cache-Control": "no-store"},
+            )
+        response = await call_next(request)
         if (
             path == "/"
             or path == "/history"
@@ -286,7 +331,8 @@ def create_app(
         auto_retry=auto_retry,
         client_factory_overridden=client_factory is not None,
     )
-    app.mount("/inputs", StaticFiles(directory=input_path, check_dir=False), name="inputs")
+    if not _yuanshu_public_mode_enabled():
+        app.mount("/inputs", StaticFiles(directory=input_path, check_dir=False), name="inputs")
     app.mount("/static", NoCacheStaticFiles(directory=static_path, check_dir=False), name="static")
     app.mount("/image-playground/static", NoCacheStaticFiles(directory=static_path, check_dir=False), name="yuanshu-static")
 
@@ -322,9 +368,30 @@ def create_app(
     def output_file(filename: str, request: Request) -> Response:
         return _yuanshu_owned_output_file(ctx, filename, request)
 
+    @app.get("/inputs/{filename:path}", response_model=None)
+    def input_file(filename: str) -> Response:
+        if _yuanshu_public_mode_enabled():
+            raise HTTPException(status_code=404, detail="Input not found")
+        clean = Path(str(filename or "").strip()).name
+        if not clean:
+            raise HTTPException(status_code=404, detail="Input not found")
+        input_path = ctx.storage.input_path(clean)
+        if not input_path.is_file():
+            raise HTTPException(status_code=404, detail="Input not found")
+        root = ctx.storage.input_root.resolve(strict=False)
+        try:
+            input_path.resolve(strict=False).relative_to(root)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="Input not found") from exc
+        return FileResponse(input_path, media_type=_guess_mime_type(input_path.name), headers={"Cache-Control": "no-store"})
+
     @app.get("/image-playground/outputs/{filename:path}", response_model=None)
     def yuanshu_output_file(filename: str, request: Request) -> Response:
         return _yuanshu_owned_output_file(ctx, filename, request)
+
+    @app.get("/image-playground/inputs/{filename:path}", response_model=None)
+    def yuanshu_input_file(filename: str, request: Request) -> Response:
+        return _yuanshu_owned_input_file(ctx, filename, request)
 
     ctx.route_helpers.update(
         {
@@ -567,6 +634,34 @@ def _mark_task_cancelled(storage: TaskStorage, task_id: str) -> dict[str, Any]:
     metadata.pop("request", None)
     storage.write_metadata(task_id, metadata)
     return metadata
+
+
+def _yuanshu_owned_input_file(ctx: WebUIContext, filename: str, request: Request) -> Response:
+    clean = Path(str(filename or "").strip()).name
+    if not clean:
+        raise HTTPException(status_code=404, detail="Input not found")
+    input_path = ctx.storage.input_path(clean)
+    if not input_path.is_file():
+        raise HTTPException(status_code=404, detail="Input not found")
+    root = ctx.storage.input_root.resolve(strict=False)
+    try:
+        input_path.resolve(strict=False).relative_to(root)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Input not found") from exc
+
+    normalized = input_path.name
+    for metadata in ctx.storage.list_tasks():
+        if not metadata_matches_current_yuanshu_owner(ctx, metadata, request):
+            continue
+        input_files = metadata.get("input_files") if isinstance(metadata.get("input_files"), list) else []
+        mask_file = str(metadata.get("mask_file") or "")
+        if normalized in {Path(str(item)).name for item in input_files if item} or normalized == Path(mask_file).name:
+            return FileResponse(
+                input_path,
+                media_type=_guess_mime_type(input_path.name),
+                headers={"Cache-Control": "private, no-store"},
+            )
+    raise HTTPException(status_code=404, detail="Input not found")
 
 
 def _yuanshu_owned_output_file(ctx: WebUIContext, filename: str, request: Request) -> Response:

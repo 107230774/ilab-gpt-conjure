@@ -26,6 +26,7 @@ from codex_image.webui.task_metadata import (
 )
 from codex_image.webui.thumbnails import create_image_thumbnail, thumbnail_needs_refresh
 from codex_image.webui.yuanshu_scope import (
+    current_yuanshu_owner_for_request,
     filter_current_yuanshu_tasks,
     metadata_matches_current_yuanshu_owner,
     require_current_yuanshu_task,
@@ -62,6 +63,25 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
             return None
         return metadata
 
+    def current_yuanshu_user_id(request: Request) -> str:
+        owner = current_yuanshu_owner_for_request(ctx, request)
+        return str(owner.get("user_id") or "").strip() if owner is not None else ""
+
+    def empty_history_summary() -> dict[str, Any]:
+        return {
+            "total": 0,
+            "archived_total": 0,
+            "months": [],
+            "statuses": [],
+            "prompt_modes": [],
+            "sizes": [],
+            "qualities": [],
+            "ratios": [],
+            "orientations": [],
+            "backends": [],
+            "providers": [],
+        }
+
     @app.get("/api/tasks")
     def list_tasks(request: Request) -> dict[str, Any]:
         active_ids = h["visible_running_task_ids"]()
@@ -74,8 +94,11 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
 
     @app.get("/api/tasks/recent")
     def list_recent_tasks(request: Request, limit: int = Query(200, ge=1, le=500)) -> dict[str, Any]:
+        user_id = current_yuanshu_user_id(request)
+        if not user_id:
+            return {"tasks": []}
         tasks: list[dict[str, Any]] = []
-        for card in ctx.storage.list_recent_task_cards(limit=limit):
+        for card in ctx.storage.list_recent_task_cards(limit=limit, yuanshu_user_id=user_id):
             owned_card = owned_sidebar_card(str(card.get("task_id") or ""), request)
             if owned_card is not None:
                 tasks.append(owned_card)
@@ -97,25 +120,10 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
 
     @app.get("/api/task-history/summary")
     def task_history_summary(request: Request) -> dict[str, Any]:
-        tasks = [
-            task
-            for candidate in ctx.storage.list_tasks()
-            if (task := owned_task_from_candidate(candidate, request)) is not None
-        ]
-        archived_total = sum(1 for task in tasks if task.get("archived_at"))
-        return {
-            "total": len(tasks),
-            "archived_total": archived_total,
-            "months": [],
-            "statuses": [],
-            "prompt_modes": [],
-            "sizes": [],
-            "qualities": [],
-            "ratios": [],
-            "orientations": [],
-            "backends": [],
-            "providers": [],
-        }
+        user_id = current_yuanshu_user_id(request)
+        if not user_id:
+            return empty_history_summary()
+        return ctx.storage.task_history_summary(yuanshu_user_id=user_id)
 
     @app.get("/api/task-history/tasks")
     def task_history_tasks(
@@ -136,6 +144,9 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
         sort: str = Query("newest"),
         direction: str = Query("next"),
     ) -> dict[str, Any]:
+        user_id = current_yuanshu_user_id(request)
+        if not user_id:
+            return {"tasks": [], "next_cursor": None, "previous_cursor": None}
         result = ctx.storage.query_task_history(
             limit=limit,
             cursor=cursor,
@@ -152,6 +163,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
             archived=archived,
             sort=sort,
             direction=direction,
+            yuanshu_user_id=user_id,
         )
         result["tasks"] = [
             task
