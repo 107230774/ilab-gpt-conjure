@@ -1,4 +1,5 @@
 import { LOCALE_CHANGE_EVENT, formatTranslation, restoreLocalePreference, translate } from "./i18n";
+import { cleanupLegacyYuanshuServiceWorker } from "./service-worker-cleanup";
 import { installYuanshuPathRuntime, yuanshuPath } from "./yuanshu-paths";
 import {
   historyDetailImagesHtml,
@@ -69,6 +70,7 @@ type HistoryContextMenuMode = "single" | "multi";
 type HistoryResizerSide = "left" | "right";
 
 const HISTORY_FILTER_KEYS: HistoryFilterKey[] = ["month", "prompt_mode", "quality", "ratio", "orientation", "backend", "provider", "archived"];
+cleanupLegacyYuanshuServiceWorker();
 installYuanshuPathRuntime();
 const HISTORY_RATIO_OTHER_VALUE = "__other__";
 const HISTORY_PAGE_LIMIT = 50;

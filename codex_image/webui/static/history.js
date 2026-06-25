@@ -11679,6 +11679,50 @@
     setLocale(saved ? normalizeLocale(saved) : detectPreferredLocale(), { persist: false });
   }
 
+  // codex_image/webui/frontend/src/service-worker-cleanup.ts
+  var YUANSHU_SERVICE_WORKER_SCOPE = "/image-playground/";
+  var YUANSHU_CACHE_PREFIX = "yuanshu-image-playground-";
+  var CLEANUP_RELOAD_FLAG = "yuanshu-image-playground-sw-cleanup-reloaded";
+  function isYuanshuServiceWorker(registration) {
+    try {
+      return new URL(registration.scope).pathname.startsWith(YUANSHU_SERVICE_WORKER_SCOPE);
+    } catch {
+      return String(registration.scope || "").includes(YUANSHU_SERVICE_WORKER_SCOPE);
+    }
+  }
+  function shouldReloadAfterCleanup() {
+    try {
+      if (sessionStorage.getItem(CLEANUP_RELOAD_FLAG) === "1") return false;
+      sessionStorage.setItem(CLEANUP_RELOAD_FLAG, "1");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  function cleanupLegacyYuanshuServiceWorker() {
+    if (!("serviceWorker" in navigator) && !("caches" in window)) return;
+    void (async () => {
+      let changed = false;
+      try {
+        const registrations = await navigator.serviceWorker?.getRegistrations?.() || [];
+        const yuanshuRegistrations = registrations.filter(isYuanshuServiceWorker);
+        await Promise.all(yuanshuRegistrations.map((registration) => registration.unregister()));
+        changed = changed || yuanshuRegistrations.length > 0 || Boolean(navigator.serviceWorker?.controller);
+      } catch {
+      }
+      try {
+        const keys = await caches.keys();
+        const legacyKeys = keys.filter((key) => key.startsWith(YUANSHU_CACHE_PREFIX));
+        await Promise.all(legacyKeys.map((key) => caches.delete(key)));
+        changed = changed || legacyKeys.length > 0;
+      } catch {
+      }
+      if (changed && shouldReloadAfterCleanup()) {
+        window.location.reload();
+      }
+    })();
+  }
+
   // codex_image/webui/frontend/src/yuanshu-paths.ts
   var YUANSHU_BASE_PATH = "/image-playground";
   var yuanshuSessionId = "";
@@ -12258,6 +12302,7 @@
 
   // codex_image/webui/frontend/src/history.ts
   var HISTORY_FILTER_KEYS = ["month", "prompt_mode", "quality", "ratio", "orientation", "backend", "provider", "archived"];
+  cleanupLegacyYuanshuServiceWorker();
   installYuanshuPathRuntime();
   var HISTORY_RATIO_OTHER_VALUE = "__other__";
   var HISTORY_PAGE_LIMIT = 50;

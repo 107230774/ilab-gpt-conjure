@@ -1,4 +1,5 @@
 import "../legacy-app.js";
+import { cleanupLegacyYuanshuServiceWorker } from "./service-worker-cleanup";
 import { installYuanshuPathRuntime } from "./yuanshu-paths";
 import { initInputSourcesFeature } from "./input-sources";
 import { initImageEditorFeature } from "./image-editor";
@@ -42,6 +43,7 @@ import { initSegmentedIndicatorFeature } from "./segmented-indicator";
 import { initI18nFeature } from "./i18n";
 import { initYuanshuModeFeature } from "./yuanshu";
 
+cleanupLegacyYuanshuServiceWorker();
 installYuanshuPathRuntime();
 initInputSourcesFeature();
 initImageEditorFeature();
