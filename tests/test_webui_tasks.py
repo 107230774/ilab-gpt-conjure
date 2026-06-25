@@ -137,6 +137,8 @@ class WebUITaskTests(unittest.TestCase):
         self.assertEqual([task["task_id"] for task in quality["tasks"]], ["20260510101010-bbbbbbbb"])
         self.assertEqual(first["tasks"][0]["prompt_mode"], "strict")
         self.assertEqual(first["tasks"][0]["quality"], "high")
+        self.assertEqual(first["tasks"][0]["prompt_preview"], "green portrait searchable")
+        self.assertEqual(first["tasks"][0]["thumbnail_url"], "/thumb-0.jpg")
         self.assertEqual([task["task_id"] for task in oldest["tasks"]], ["20260409101010-cccccccc"])
         self.assertEqual([task["task_id"] for task in previous["tasks"]], ["20260510101010-bbbbbbbb"])
         self.assertNotIn("outputs", first["tasks"][0])

@@ -63,6 +63,30 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
             return None
         return metadata
 
+    def owned_history_candidate(candidate: dict[str, Any], request: Request) -> dict[str, Any] | None:
+        task_id = str(candidate.get("task_id") or "")
+        if not task_id:
+            return None
+        try:
+            metadata = ctx.storage.read_metadata(task_id)
+        except (FileNotFoundError, OSError, ValueError):
+            return None
+        if not isinstance(metadata, dict):
+            return None
+        metadata["task_id"] = str(metadata.get("task_id") or task_id)
+        if not metadata_matches_current_yuanshu_owner(ctx, metadata, request):
+            return None
+        task = dict(candidate)
+        task["task_id"] = task_id
+        if not task.get("prompt_preview"):
+            task["prompt_preview"] = str(metadata.get("prompt") or metadata.get("prompt_for_model") or "")
+        if not task.get("thumbnail_url"):
+            sidebar_card = _sidebar_task_card(metadata)
+            thumbnail_urls = sidebar_card.get("thumbnail_urls")
+            if isinstance(thumbnail_urls, list) and thumbnail_urls:
+                task["thumbnail_url"] = str(thumbnail_urls[0])
+        return task
+
     def current_yuanshu_user_id(request: Request) -> str:
         owner = current_yuanshu_owner_for_request(ctx, request)
         return str(owner.get("user_id") or "").strip() if owner is not None else ""
@@ -168,7 +192,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
         result["tasks"] = [
             task
             for candidate in list(result.get("tasks") or [])
-            if (task := owned_task_from_candidate(candidate, request)) is not None
+            if (task := owned_history_candidate(candidate, request)) is not None
         ]
         return result
 
