@@ -1,6 +1,6 @@
 # Yuanshu Image Playground Runbook
 
-Last updated: 2026-06-27 18:38 CST
+Last updated: 2026-06-27 19:47 CST
 
 This file is the project-local source of truth for Yuanshu online image playground development, release, deployment, rollback, and production status. Future work in this repository should read this file first instead of depending on Sub2API-side deployment notes.
 
@@ -35,8 +35,8 @@ Nginx routing on `yuan`:
 Active yuan image service:
 
 - Container name: `yuanshu-image-playground`
-- Runtime image: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-idempotency-cachebump-20260627`
-- Image ID: `sha256:c82d7095e58c7adad1449d31214e128b3107fe427ca8f8facf56b71be78c98c9`
+- Runtime image: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-worker-scope-20260627`
+- Image ID: `sha256:3170f391412b876d2302897d0d93dd341627356d8e3839bf3e28f6b980e4b93d`
 - Host port: `127.0.0.1:18080` -> container port `8787`
 - Persistent data: `/opt/yuanshu-image-playground/ilab-output` mounted at `/app/output`
 - Backup root: `/opt/yuanshu-image-playground/backups`
@@ -44,6 +44,8 @@ Active yuan image service:
 Current rollback anchor:
 
 - Old target container is intentionally still running during the 24-hour observation window after the 2026-06-26 migration.
+- Previous yuan image before the gallery worker-scope fix: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-idempotency-cachebump-20260627`.
+- Inspect backup before the gallery worker-scope cutover: `/opt/yuanshu-image-playground/backups/yuanshu-image-playground-before-gallery-worker-scope-20260627-194624.json`.
 - Previous yuan image before the gallery/idempotency cache-bump release: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-idempotency-20260627`.
 - Inspect backup before the gallery/idempotency cache-bump cutover: `/opt/yuanshu-image-playground/backups/yuanshu-image-playground-before-gallery-idempotency-cachebump-20260627-183737.json`.
 - Previous yuan image before the quality hotfix: `yuanshu-image-playground:0.1.1-ilab-yuanshu-preview-loading-20260625`.
@@ -520,6 +522,43 @@ curl -fsS https://yuans.vip/image-playground/api/health | head -c 300
 Note: because target IP was classified as robot IP traffic by the upstream provider, this rollback may restore page/history service but may not restore successful image generation.
 
 ## Latest Release Record
+
+2026-06-27 19:47 CST, `image-playground gallery worker-scope fix`:
+
+- Type: yuan-local image playground hotfix; did not rebuild or restart Sub2API, PostgreSQL, Redis, billing, account pool, usage logs, Nginx, or the main Yuanshu app.
+- Root cause: generation submit resolved user-scoped gallery refs correctly, but the async queue worker later executed without an HTTP request or `X-Yuanshu-Session` and used default `ctx.gallery_storage`; user gallery IDs under `source-data/yuanshu-users/<user_id>/gallery` then failed with `Gallery item not found`.
+- Code fix: queue worker now restores gallery storage from task metadata `yuanshu_owner.user_id`; local non-Yuanshu tasks still use the default gallery storage.
+- Template library note: prompt templates still resolve only during HTTP request handling and are not re-read by the worker, so no matching worker-scope bug was found.
+- Source commit deployed: `b6616d0 fix: resolve yuanshu gallery refs in queue worker`.
+- Source package: `/tmp/ilab-gpt-conjure-yuanshu-gallery-worker-scope-b6616d0.tgz`.
+- Source package SHA256: `2016483bac3d5ab883364e10fd8d5bd66abcdd80dc0fe2bc63cd3660382cc3a5`.
+- New image: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-worker-scope-20260627`.
+- New image ID: `sha256:3170f391412b876d2302897d0d93dd341627356d8e3839bf3e28f6b980e4b93d`.
+- Rollback backup: `/opt/yuanshu-image-playground/backups/yuanshu-image-playground-before-gallery-worker-scope-20260627-194624.json`.
+- Previous image retained: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-idempotency-cachebump-20260627`.
+- Local validation: `python -m unittest tests.test_webui_gallery tests.test_webui_generation tests.test_webui_settings -v`; `npm run check:webui`; `python -m py_compile` for `codex_image`.
+- Canary validation: yuan `127.0.0.1:18081` `/api/health`, homepage `runtime-386` static references, history page references, and unauthenticated `POST /api/gallery` returning 403.
+- Production validation: yuan `127.0.0.1:18080` `/api/health`, homepage `runtime-386` static references, history page references, unauthenticated `POST /api/gallery` returning 403, and no recent serious image-playground logs.
+- Public validation: `https://yuans.vip/health`, `/image-playground/api/health`, `/image-playground/`, `/image-playground/history`, and `/image-playground/static/app.js?v=runtime-386` returned OK.
+- Static validation: no frontend bundle changed, so no runtime bump was needed; `/image-playground/static/app.js?v=runtime-386` returned gzip and `X-Yuanshu-Static-Cache: HIT` after cache warmup.
+
+Rollback for this hotfix:
+
+```bash
+rtk ssh yuan "set -euo pipefail
+docker rm -f yuanshu-image-playground
+docker run -d --name yuanshu-image-playground \
+  -p 127.0.0.1:18080:8787 \
+  -e ILAB_CONJURE_DATA_DIR=/app/output \
+  -e YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE=true \
+  -e YUANSHU_IMAGE_PLAYGROUND_API_BASE=https://yuans.vip/image-playground/api/v1 \
+  -e YUANSHU_IMAGE_PLAYGROUND_PATH_PREFIX=/image-playground \
+  -v /opt/yuanshu-image-playground/ilab-output:/app/output \
+  yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-idempotency-cachebump-20260627
+curl -fsS http://127.0.0.1:18080/api/health | head -c 300
+curl -fsS https://yuans.vip/image-playground/ | grep -E '/image-playground/static/(styles.css|app.js)' | head -2
+"
+```
 
 2026-06-27 18:38 CST, `image-playground gallery/idempotency cache-bump release`:
 
