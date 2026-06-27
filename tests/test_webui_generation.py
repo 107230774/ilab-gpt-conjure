@@ -53,11 +53,75 @@ from tests.webui_helpers import (
 
 
 class WebUIGenerationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._public_mode_patch = patch.dict(os.environ, {"YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE": "false"})
+        self._public_mode_patch.start()
+
+    def tearDown(self) -> None:
+        self._public_mode_patch.stop()
+
+    def _add_yuanshu_session(self, app, session_id: str, *, user_id: int, key_id: int) -> dict[str, str]:
+        app.state.ctx.yuanshu_sessions[session_id] = {
+            "token": f"token-{session_id}",
+            "key_id": key_id,
+            "user_id": user_id,
+            "session_token_id": f"session-token-{session_id}",
+        }
+        return {"X-Yuanshu-Session": session_id}
+
     def _png_bytes(self, size: tuple[int, int] = (400, 640)) -> bytes:
         image = Image.new("RGB", size, (120, 180, 160))
         buffer = BytesIO()
         image.save(buffer, format="PNG")
         return buffer.getvalue()
+
+    def test_yuanshu_generate_reuses_active_duplicate_by_user_fingerprint(self) -> None:
+        from codex_image.webui.app import create_app
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE": "true"}):
+            root = Path(tmp)
+            app = create_app(
+                output_root=root,
+                source_data_root=root / "source-data",
+                client_factory=lambda: FakeImageClient(),
+                auth_checker=lambda: False,
+                auto_start_queue=False,
+            )
+            client = TestClient(app)
+            user_a = self._add_yuanshu_session(app, "session-a", user_id=101, key_id=1)
+            user_a_new_key = self._add_yuanshu_session(app, "session-a-new-key", user_id=101, key_id=2)
+            user_b = self._add_yuanshu_session(app, "session-b", user_id=202, key_id=1)
+            data = {
+                "prompt": "draw a reusable portrait",
+                "prompt_for_model": "draw a reusable portrait",
+                "main_model": "gpt-5.4",
+                "model": "gpt-image-2",
+                "size": "1024x1024",
+                "quality": "low",
+                "output_format": "png",
+                "moderation": "auto",
+                "n": "1",
+                "api_provider_id": "yuanshu",
+                "api_mode": "images",
+            }
+            with patch("codex_image.webui.routes.generation.verify_yuanshu_token", return_value={"ok": True}):
+                first = client.post("/api/generate", data=data, headers=user_a)
+                second_same_user = client.post("/api/generate", data=data, headers=user_a_new_key)
+                same_request_other_user = client.post("/api/generate", data=data, headers=user_b)
+                first_task_id = first.json()["task"]["task_id"]
+                metadata = app.state.ctx.storage.read_metadata(first_task_id)
+                metadata["status"] = "completed"
+                app.state.ctx.storage.write_metadata(first_task_id, metadata)
+                after_completed = client.post("/api/generate", data=data, headers=user_a_new_key)
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second_same_user.status_code, 200)
+        self.assertTrue(second_same_user.json()["duplicate"])
+        self.assertEqual(second_same_user.json()["task"]["task_id"], first.json()["task"]["task_id"])
+        self.assertEqual(same_request_other_user.status_code, 200)
+        self.assertNotEqual(same_request_other_user.json()["task"]["task_id"], first.json()["task"]["task_id"])
+        self.assertEqual(after_completed.status_code, 200)
+        self.assertNotEqual(after_completed.json()["task"]["task_id"], first.json()["task"]["task_id"])
 
     def test_generate_route_persists_task_and_passes_parameters(self) -> None:
         from codex_image.webui.app import create_app

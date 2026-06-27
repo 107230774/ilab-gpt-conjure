@@ -7,14 +7,16 @@ from fastapi import Request
 
 from .context import WebUIContext
 from .task_metadata import _gallery_item_response, _with_file_urls
+from .yuanshu_resources import yuanshu_gallery_storage
 from .yuanshu_scope import current_yuanshu_owner_for_request, filter_current_yuanshu_tasks, metadata_matches_current_yuanshu_owner
 
 
 def queue_snapshot(ctx: WebUIContext, request: Request | None = None) -> dict[str, Any]:
     state = ctx.queue_storage.read_state()
     active_ids = ctx.route_helpers["visible_running_task_ids"]()
+    gallery_storage = yuanshu_gallery_storage(ctx, request)
     waiting = [
-        _with_file_urls(task, active_ids, ctx.gallery_storage, ctx.reference_asset_storage, include_request=False)
+        _with_file_urls(task, active_ids, gallery_storage, ctx.reference_asset_storage, include_request=False)
         for task in filter_current_yuanshu_tasks(
             ctx,
             [ctx.storage.read_metadata(task_id) for task_id in state["waiting"] if ctx.storage.metadata_path(task_id).exists()],
@@ -32,7 +34,7 @@ def queue_snapshot(ctx: WebUIContext, request: Request | None = None) -> dict[st
         task = _with_file_urls(
             metadata,
             active_ids,
-            ctx.gallery_storage,
+            gallery_storage,
             ctx.reference_asset_storage,
             include_request=False,
         )
@@ -57,11 +59,12 @@ def event_snapshot(ctx: WebUIContext, request: Request | None = None) -> dict[st
     owner = current_yuanshu_owner_for_request(ctx, request)
     user_id = str(owner.get("user_id") or "").strip() if owner is not None else ""
     recent_cards = ctx.storage.list_recent_task_cards(limit=200, yuanshu_user_id=user_id) if user_id else []
+    gallery_storage = yuanshu_gallery_storage(ctx, request)
     return {
         "type": "snapshot",
         "tasks": filter_current_yuanshu_tasks(ctx, recent_cards, request),
         "queue": queue_snapshot(ctx, request),
-        "gallery": [_gallery_item_response(item) for item in ctx.gallery_storage.list_items()],
+        "gallery": [_gallery_item_response(item) for item in gallery_storage.list_items()],
         "auth": ctx.route_helpers["auth_event_payload"](),
     }
 
@@ -93,7 +96,7 @@ def task_event(ctx: WebUIContext, task_id: str, request: Request | None = None) 
         "task": _with_file_urls(
             metadata,
             ctx.route_helpers["visible_running_task_ids"](),
-            ctx.gallery_storage,
+            yuanshu_gallery_storage(ctx, request),
             ctx.reference_asset_storage,
             include_request=False,
         ),

@@ -60,6 +60,65 @@ def _fake_jwt(payload: dict[str, object]) -> str:
 
 
 class WebUISettingsTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._public_mode_patch = patch.dict(os.environ, {"YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE": "false"})
+        self._public_mode_patch.start()
+
+    def tearDown(self) -> None:
+        self._public_mode_patch.stop()
+
+    def _add_yuanshu_session(self, app, session_id: str, *, user_id: int, key_id: int) -> dict[str, str]:
+        app.state.ctx.yuanshu_sessions[session_id] = {
+            "token": f"token-{session_id}",
+            "key_id": key_id,
+            "user_id": user_id,
+            "session_token_id": f"session-token-{session_id}",
+        }
+        return {"X-Yuanshu-Session": session_id}
+
+    def test_public_mode_prompt_libraries_require_session_and_use_user_scope(self) -> None:
+        from codex_image.webui.app import create_app
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE": "true"}):
+            root = Path(tmp)
+            app = create_app(
+                output_root=root / "tasks",
+                source_data_root=root / "source-data",
+                client_factory=lambda: FakeImageClient(),
+                auth_checker=lambda: True,
+                auto_start_queue=False,
+            )
+            client = TestClient(app)
+            user_a = self._add_yuanshu_session(app, "session-a", user_id=101, key_id=1)
+            user_a_new_key = self._add_yuanshu_session(app, "session-a-new-key", user_id=101, key_id=2)
+            user_b = self._add_yuanshu_session(app, "session-b", user_id=202, key_id=1)
+
+            forbidden_snippet = client.post("/api/prompt-snippets", json={"tag": "pose", "title": "姿势", "content": "侧身站立"})
+            forbidden_template = client.post("/api/prompt-templates", json={"title": "人像模板", "content": "生成人像"})
+            created_snippet = client.post(
+                "/api/prompt-snippets",
+                json={"tag": "pose", "title": "姿势", "content": "侧身站立"},
+                headers=user_a,
+            )
+            created_template = client.post(
+                "/api/prompt-templates",
+                json={"title": "人像模板", "content": "生成人像", "category": "人像"},
+                headers=user_a,
+            )
+            same_user_snippets = client.get("/api/prompt-snippets", headers=user_a_new_key).json()["snippets"]
+            same_user_templates = client.get("/api/prompt-templates", headers=user_a_new_key).json()["templates"]
+            other_user_snippets = client.get("/api/prompt-snippets", headers=user_b).json()["snippets"]
+            other_user_templates = client.get("/api/prompt-templates", headers=user_b).json()["templates"]
+
+        self.assertEqual(forbidden_snippet.status_code, 403)
+        self.assertEqual(forbidden_template.status_code, 403)
+        self.assertEqual(created_snippet.status_code, 200)
+        self.assertEqual(created_template.status_code, 200)
+        self.assertEqual([snippet["tag"] for snippet in same_user_snippets], ["pose"])
+        self.assertEqual([template["title"] for template in same_user_templates], ["人像模板"])
+        self.assertEqual(other_user_snippets, [])
+        self.assertEqual(other_user_templates, [])
+
     def test_health_reports_missing_auth(self) -> None:
         from codex_image.webui.app import create_app
 

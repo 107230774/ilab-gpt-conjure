@@ -96,8 +96,7 @@ export function initYuanshuModeFeature() {
     try {
       const bootstrap = await postYuanshuBootstrap(event.data.payload || {});
       const userId = String(bootstrap?.yuanshu?.user_id || event.data.payload?.userId || "anonymous");
-      const keyId = String(bootstrap?.yuanshu?.key_id || event.data.payload?.keyId || "default");
-      const scopeId = `user:${userId}:key:${keyId}`;
+      const scopeId = `user:${userId}`;
       setYuanshuSessionId(String(bootstrap?.yuanshu?.session_id || ""));
       setYuanshuScopeId(scopeId);
       resetYuanshuWorkspaceForScope(scopeId);
@@ -110,6 +109,10 @@ export function initYuanshuModeFeature() {
       bridge.methods.refreshTaskNotificationScope?.();
       window.startRealtimeUpdates?.({ migrateLegacyArchives: false });
       await bridge.methods.refreshHealth?.();
+      await bridge.methods.refreshGallery?.();
+      await bridge.methods.refreshPromptTemplates?.();
+      await bridge.methods.refreshPromptSnippets?.();
+      await bridge.methods.refreshRecentAssets?.();
       await bridge.methods.refreshTasks?.({ preserveExistingOnEmpty: true });
       await window.refreshQueue?.();
     } catch (error) {

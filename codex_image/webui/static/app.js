@@ -36866,6 +36866,7 @@ ${galleryText}`;
   }
   var SUBMIT_TASK_TIMEOUT_MS = 45e3;
   var YUANSHU_SUBMIT_SETTLE_REFRESH_DELAYS_MS = [1e3, 2500, 5e3, 9e3, 15e3, 25e3, 4e4, 6e4];
+  var ACTIVE_DEDUPLICATION_STATUSES = /* @__PURE__ */ new Set(["submitting", "queued", "running"]);
   function errorMessage4(error, fallback) {
     return error instanceof Error ? error.message || fallback : fallback;
   }
@@ -37000,6 +37001,91 @@ ${galleryText}`;
   }
   function renderPreview4(...args) {
     return legacyMethod34("renderPreview", ...args);
+  }
+  function renderTasks6(...args) {
+    return legacyMethod34("renderTasks", ...args);
+  }
+  function dedupePreserveOrder(values) {
+    const seen = /* @__PURE__ */ new Set();
+    const result = [];
+    values.forEach((value) => {
+      const item = String(value || "").trim();
+      if (!item || seen.has(item)) return;
+      seen.add(item);
+      result.push(item);
+    });
+    return result;
+  }
+  function canonicalJson(value) {
+    if (value === null || typeof value !== "object") {
+      return JSON.stringify(value);
+    }
+    if (Array.isArray(value)) {
+      return "[" + value.map((item) => canonicalJson(item)).join(",") + "]";
+    }
+    const keys = Object.keys(value).sort();
+    return "{" + keys.map((key) => JSON.stringify(key) + ":" + canonicalJson(value[key])).join(",") + "}";
+  }
+  function bytesToHex(bytes) {
+    return Array.from(new Uint8Array(bytes)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  async function sha256Hex(data) {
+    const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+    return bytesToHex(await crypto.subtle.digest("SHA-256", bytes));
+  }
+  async function uploadFileFingerprints(uploads) {
+    const result = [];
+    for (const source of uploads) {
+      if (!source?.file) continue;
+      result.push({
+        sha256: await sha256Hex(await source.file.arrayBuffer()),
+        filename: String(source.file.name || source.name || ""),
+        content_type: String(source.file.type || "")
+      });
+    }
+    return result;
+  }
+  async function currentGenerateRequestFingerprint(prompt, promptForModel, uploads, galleries, assets) {
+    const params = currentTaskParams2();
+    const payload2 = {
+      mode: "generate",
+      prompt,
+      prompt_for_model: promptForModel,
+      main_model: currentMainModel2(),
+      model: params.model,
+      size: params.size,
+      resolution: params.resolution || "",
+      ratio: params.ratio || "",
+      orientation: params.orientation || "",
+      quality: params.quality,
+      output_format: params.output_format,
+      moderation: params.moderation,
+      output_compression: String(params.output_compression || ""),
+      n: params.n,
+      prompt_fidelity: currentPromptFidelity3(),
+      web_search: Boolean(params.web_search),
+      api_provider_id: "yuanshu",
+      api_mode: "images",
+      codex_mode: "",
+      gallery_image_ids: dedupePreserveOrder(galleries.map((source) => source.id)),
+      reference_asset_ids: dedupePreserveOrder(assets.map((source) => source.id)),
+      upload_fingerprints: await uploadFileFingerprints(uploads)
+    };
+    return sha256Hex(canonicalJson(payload2));
+  }
+  function activeTaskFingerprint(task) {
+    return String(task?.request_fingerprint || task?.request?.webui_request_fingerprint || "");
+  }
+  function findActiveDuplicateTask(requestFingerprint) {
+    if (!requestFingerprint) return null;
+    return (state24.tasks || []).find((task) => ACTIVE_DEDUPLICATION_STATUSES.has(String(task?.status || "")) && activeTaskFingerprint(task) === requestFingerprint) || null;
+  }
+  function focusDuplicateTask(task) {
+    if (!task?.task_id) return;
+    state24.selectedTaskId = task.task_id;
+    state24.previewTask = task;
+    renderTasks6();
+    renderPreview4(task);
   }
   function isYuanshuMode2() {
     return document.documentElement.dataset.yuanshuMode === "true";
@@ -37159,12 +37245,15 @@ ${galleryText}`;
     }
     return payload2;
   }
-  function createPendingTask() {
+  function createPendingTask(requestFingerprint = "") {
     const taskId = `pending-${Date.now()}`;
     const now2 = (/* @__PURE__ */ new Date()).toISOString();
     const localInputFiles = state24.images.slice();
     const previewSource = localInputFiles[0];
     const request = buildPreviewRequest2();
+    if (requestFingerprint) {
+      request.webui_request_fingerprint = requestFingerprint;
+    }
     return {
       task_id: taskId,
       local_pending: true,
@@ -37173,6 +37262,7 @@ ${galleryText}`;
       started_at: now2,
       mode: state24.mode,
       status: "submitting",
+      request_fingerprint: requestFingerprint,
       prompt: getPromptText9(),
       prompt_for_model: currentPromptForModel2(),
       requested_backend: request.requested_backend,
@@ -37262,12 +37352,27 @@ ${galleryText}`;
       window.parent?.postMessage({ type: "yuanshu:image-playground-ready" }, window.location.origin);
       return;
     }
+    let requestFingerprint = "";
+    if (yuanshuMode) {
+      try {
+        requestFingerprint = await currentGenerateRequestFingerprint(prompt, promptForModel, uploads, galleries, assets);
+        const duplicateTask = findActiveDuplicateTask(requestFingerprint);
+        if (duplicateTask) {
+          focusDuplicateTask(duplicateTask);
+          setStatus17("\u76F8\u540C\u53C2\u6570\u7684\u4EFB\u52A1\u5DF2\u7ECF\u5728\u63D0\u4EA4\u6216\u751F\u6210\u4E2D\uFF0C\u5DF2\u5207\u6362\u5230\u5DF2\u6709\u4EFB\u52A1\u3002", "ok");
+          return;
+        }
+        form.append("request_fingerprint", requestFingerprint);
+      } catch (error) {
+        console.warn("Failed to compute request fingerprint", error);
+      }
+    }
     if (yuanshuMode || state24.mode === "generate") {
       uploads.forEach((source) => form.append("reference_images", source.file));
     } else {
       uploads.forEach((source) => form.append("images", source.file));
     }
-    const pendingTask = createPendingTask();
+    const pendingTask = createPendingTask(requestFingerprint);
     if (!yuanshuMode) {
       addPendingTask2(pendingTask);
     }
@@ -37304,7 +37409,7 @@ ${galleryText}`;
         els33.requestJson.textContent = JSON.stringify(data.request || {}, null, 2);
       }
       stopRunFeedback2();
-      setStatus17(translate("taskSubmit.queued"), "ok");
+      setStatus17(data.duplicate ? "\u76F8\u540C\u53C2\u6570\u7684\u4EFB\u52A1\u5DF2\u7ECF\u5728\u63D0\u4EA4\u6216\u751F\u6210\u4E2D\uFF0C\u5DF2\u8FD4\u56DE\u5DF2\u6709\u4EFB\u52A1\u3002" : translate("taskSubmit.queued"), "ok");
       await window.refreshQueue?.();
       await getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
       await refreshRecentAssets2();
@@ -37345,7 +37450,7 @@ ${galleryText}`;
     }
     return method(...args);
   }
-  var renderTasks6 = () => legacyMethod35("renderTasks");
+  var renderTasks7 = () => legacyMethod35("renderTasks");
   var syncTaskSearchHistoryResults = () => legacyMethod35("syncTaskSearchHistoryResults");
   var setExpandedTaskGroupKey2 = (...args) => legacyMethod35("setExpandedTaskGroupKey", ...args);
   var scrollExpandedTaskGroupToTop3 = (...args) => legacyMethod35("scrollExpandedTaskGroupToTop", ...args);
@@ -37375,12 +37480,12 @@ ${galleryText}`;
     els34.batchCancelButton?.addEventListener("click", () => toggleBatchMode2(false));
     els34.taskSearch.addEventListener("input", handleTaskSearchInput);
     [els34.taskRatioFilter, els34.taskOrientationFilter, els34.taskPromptFidelityFilter, els34.taskResolutionFilter].filter(Boolean).forEach((element2) => {
-      element2.addEventListener("change", renderTasks6);
+      element2.addEventListener("change", renderTasks7);
     });
     bindTaskListEvents();
   }
   function handleTaskSearchInput() {
-    renderTasks6();
+    renderTasks7();
     void syncTaskSearchHistoryResults();
   }
   function bindTaskListEvents() {
@@ -37396,7 +37501,7 @@ ${galleryText}`;
     const previousLayout = captureTaskHistoryLayout3();
     const changed = nextKey === null ? setExpandedTaskGroupKey2(null, { immediate: true }) : setExpandedTaskGroupKey2(nextKey, { immediate: true });
     if (changed) {
-      renderTasks6();
+      renderTasks7();
       animateTaskHistoryLayout3(previousLayout);
     }
     if (nextKey && behavior) {
@@ -39730,7 +39835,7 @@ ${galleryText}`;
   function updateTaskInState3(...args) {
     return legacyMethod38("updateTaskInState", ...args);
   }
-  function renderTasks7(...args) {
+  function renderTasks8(...args) {
     return legacyMethod38("renderTasks", ...args);
   }
   function taskApiProviderId2(...args) {
@@ -40293,7 +40398,7 @@ ${galleryText}`;
       const updatedTask = data.task;
       updateTaskInState3(updatedTask);
       state28.selectedTaskId = updatedTask.task_id;
-      renderTasks7();
+      renderTasks8();
       renderPreview5(updatedTask);
       setStatus20(translate("preview.deleteUnselectedDone"), "ok");
     } catch (error) {
@@ -40529,7 +40634,7 @@ ${galleryText}`;
   }
   var updateTaskInState4 = (...args) => legacyMethod39("updateTaskInState", ...args);
   var cleanupSessionSelections2 = (...args) => legacyMethod39("cleanupSessionSelections", ...args);
-  var renderTasks8 = (...args) => legacyMethod39("renderTasks", ...args);
+  var renderTasks9 = (...args) => legacyMethod39("renderTasks", ...args);
   var renderArchiveButton4 = (...args) => legacyMethod39("renderArchiveButton", ...args);
   var renderArchiveModal4 = (...args) => legacyMethod39("renderArchiveModal", ...args);
   var renderPreview6 = (...args) => legacyMethod39("renderPreview", ...args);
@@ -40610,7 +40715,7 @@ ${galleryText}`;
       if (requestSeq !== state29.tasksRequestSeq) return;
     }
     cleanupSessionSelections2();
-    renderTasks8();
+    renderTasks9();
     renderArchiveButton4();
     renderArchiveModal4();
     await renderSelectedTaskPreview(requestSeq);
@@ -40621,7 +40726,7 @@ ${galleryText}`;
       void markTaskViewed2(task.task_id);
     }
     cleanupSessionSelections2();
-    renderTasks8();
+    renderTasks9();
     renderArchiveButton4();
     renderArchiveModal4();
     await renderSelectedTaskPreview();
@@ -40712,7 +40817,7 @@ ${galleryText}`;
     if (!response.ok) throw new Error(data.detail || "Task history search failed");
     if (requestSeq !== state29.taskSearchHistoryRequestSeq || currentTaskSearchQuery() !== query) return;
     mergeTaskSearchHistoryResults(Array.isArray(data.tasks) ? data.tasks : []);
-    renderTasks8({ preserveScroll: true });
+    renderTasks9({ preserveScroll: true });
   }
   async function syncTaskSearchHistoryResults2() {
     window.clearTimeout(taskSearchHistoryTimerId);
@@ -40720,7 +40825,7 @@ ${galleryText}`;
     const requestSeq = ++state29.taskSearchHistoryRequestSeq;
     if (!query) {
       clearTaskSearchHistoryResults();
-      renderTasks8({ preserveScroll: true });
+      renderTasks9({ preserveScroll: true });
       return;
     }
     taskSearchHistoryTimerId = window.setTimeout(() => {
@@ -41466,7 +41571,7 @@ ${galleryText}`;
   function renderImageStrip7() {
     legacyMethod42("renderImageStrip");
   }
-  function renderTasks9() {
+  function renderTasks10() {
     legacyMethod42("renderTasks");
   }
   function renderPreview8() {
@@ -41714,7 +41819,7 @@ ${galleryText}`;
     if (els41.ratio) els41.ratio.value = "1:1";
     if (els41.orientation) els41.orientation.value = "square";
     els41.size.value = "1024x1024";
-    els41.quality.value = "auto";
+    els41.quality.value = "medium";
     els41.outputFormat.value = "png";
     els41.moderation.value = "auto";
     els41.compression.value = "80";
@@ -41729,7 +41834,7 @@ ${galleryText}`;
     updateQuantity3();
     updateCompression3();
     renderImageStrip7();
-    renderTasks9();
+    renderTasks10();
     renderPreview8();
     updateRequestPreview13();
     setStatus22(translate("status.waiting"), "");
@@ -42149,8 +42254,7 @@ ${galleryText}`;
       try {
         const bootstrap = await postYuanshuBootstrap(event.data.payload || {});
         const userId = String(bootstrap?.yuanshu?.user_id || event.data.payload?.userId || "anonymous");
-        const keyId = String(bootstrap?.yuanshu?.key_id || event.data.payload?.keyId || "default");
-        const scopeId = `user:${userId}:key:${keyId}`;
+        const scopeId = `user:${userId}`;
         setYuanshuSessionId(String(bootstrap?.yuanshu?.session_id || ""));
         setYuanshuScopeId(scopeId);
         resetYuanshuWorkspaceForScope(scopeId);
@@ -42163,6 +42267,10 @@ ${galleryText}`;
         bridge39.methods.refreshTaskNotificationScope?.();
         window.startRealtimeUpdates?.({ migrateLegacyArchives: false });
         await bridge39.methods.refreshHealth?.();
+        await bridge39.methods.refreshGallery?.();
+        await bridge39.methods.refreshPromptTemplates?.();
+        await bridge39.methods.refreshPromptSnippets?.();
+        await bridge39.methods.refreshRecentAssets?.();
         await bridge39.methods.refreshTasks?.({ preserveExistingOnEmpty: true });
         await window.refreshQueue?.();
       } catch (error) {

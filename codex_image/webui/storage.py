@@ -88,6 +88,10 @@ class TaskStorage:
         path.write_text(json.dumps(request, indent=2, ensure_ascii=False), encoding="utf-8")
         return path
 
+    def read_request(self, task_id: str) -> dict[str, Any]:
+        path = self.request_path(task_id)
+        return json.loads(path.read_text(encoding="utf-8"))
+
     def write_input(self, task_id: str, filename: str, data: bytes, *, kind: str = "input", index: int | None = None) -> Path:
         if kind not in {"input", "mask"}:
             raise ValueError("Input kind must be input or mask")

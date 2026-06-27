@@ -212,8 +212,9 @@ class OpenAIImagesImageClient:
         }
         if size:
             payload["size"] = size
-        if quality:
-            payload["quality"] = quality
+        normalized_quality = self._quality_for_request(quality)
+        if normalized_quality:
+            payload["quality"] = normalized_quality
         if background:
             payload["background"] = background
         if input_fidelity and image_model_supports_input_fidelity(image_model):
@@ -267,6 +268,13 @@ class OpenAIImagesImageClient:
     def _json_request_payload(payload: dict[str, Any]) -> dict[str, Any]:
         omitted = {"endpoint", "images", "mask"}
         return {key: value for key, value in payload.items() if key not in omitted and value is not None}
+
+    @staticmethod
+    def _quality_for_request(quality: str | None) -> str:
+        normalized = str(quality or "").strip()
+        if normalized.lower() == "auto":
+            return ""
+        return normalized
 
     @classmethod
     def _build_multipart_edit_body(cls, payload: dict[str, Any]) -> tuple[bytes, str]:

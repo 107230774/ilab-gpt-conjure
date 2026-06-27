@@ -697,6 +697,58 @@ class ClientTests(unittest.TestCase):
         self.assertIn('name="image"; filename="image-1.png"', request["body"].decode("utf-8", errors="replace"))
         self.assertIn(b"image", request["body"])
 
+    def test_openai_images_client_omits_auto_quality_from_direct_request(self) -> None:
+        image_b64 = base64.b64encode(b"api-image").decode("ascii")
+        transport = FakeTransport(
+            [
+                FakeResponse(
+                    status=200,
+                    body=json.dumps({"data": [{"b64_json": image_b64}]}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                )
+            ]
+        )
+
+        from codex_image.client import OpenAIImagesImageClient
+
+        client = OpenAIImagesImageClient(
+            api_key="test-api-key-secret",
+            base_url="https://api.example.com",
+            image_model="gpt-image-2",
+            transport=transport,
+        )
+        client.generate_image(prompt="draw auto quality", quality="auto", output_format="png")
+
+        payload = json.loads(transport.requests[0]["body"].decode("utf-8"))
+        self.assertNotIn("quality", payload)
+        self.assertEqual(payload["output_format"], "png")
+
+    def test_openai_images_client_keeps_explicit_quality_from_direct_request(self) -> None:
+        image_b64 = base64.b64encode(b"api-image").decode("ascii")
+        transport = FakeTransport(
+            [
+                FakeResponse(
+                    status=200,
+                    body=json.dumps({"data": [{"b64_json": image_b64}]}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                )
+            ]
+        )
+
+        from codex_image.client import OpenAIImagesImageClient
+
+        client = OpenAIImagesImageClient(
+            api_key="test-api-key-secret",
+            base_url="https://api.example.com",
+            image_model="gpt-image-2",
+            transport=transport,
+        )
+        client.generate_image(prompt="draw medium quality", quality="medium", output_format="png")
+
+        payload = json.loads(transport.requests[0]["body"].decode("utf-8"))
+        self.assertEqual(payload["quality"], "medium")
+        self.assertEqual(payload["output_format"], "png")
+
     def test_openai_images_client_downloads_url_image_output(self) -> None:
         transport = FakeTransport(
             [

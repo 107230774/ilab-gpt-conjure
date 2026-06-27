@@ -16,6 +16,7 @@ function legacyMethod(name: string, ...args: any[]): any {
 
 const SUBMIT_TASK_TIMEOUT_MS = 45000;
 const YUANSHU_SUBMIT_SETTLE_REFRESH_DELAYS_MS = [1000, 2500, 5000, 9000, 15000, 25000, 40000, 60000];
+const ACTIVE_DEDUPLICATION_STATUSES = new Set(["submitting", "queued", "running"]);
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message || fallback : fallback;
@@ -65,6 +66,109 @@ function stopRunFeedback(...args: any[]) { return legacyMethod("stopRunFeedback"
 function markPendingTaskFailed(...args: any[]) { return legacyMethod("markPendingTaskFailed", ...args); }
 function refreshRecentAssets(...args: any[]) { return legacyMethod("refreshRecentAssets", ...args); }
 function renderPreview(...args: any[]) { return legacyMethod("renderPreview", ...args); }
+function renderTasks(...args: any[]) { return legacyMethod("renderTasks", ...args); }
+
+function dedupePreserveOrder(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  values.forEach((value) => {
+    const item = String(value || "").trim();
+    if (!item || seen.has(item)) return;
+    seen.add(item);
+    result.push(item);
+  });
+  return result;
+}
+
+function canonicalJson(value: any): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return "[" + value.map((item) => canonicalJson(item)).join(",") + "]";
+  }
+  const keys = Object.keys(value).sort();
+  return "{" + keys.map((key) => JSON.stringify(key) + ":" + canonicalJson(value[key])).join(",") + "}";
+}
+
+function bytesToHex(bytes: ArrayBuffer): string {
+  return Array.from(new Uint8Array(bytes))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function sha256Hex(data: string | ArrayBuffer): Promise<string> {
+  const bytes = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  return bytesToHex(await crypto.subtle.digest("SHA-256", bytes));
+}
+
+async function uploadFileFingerprints(uploads: any[]): Promise<Array<Record<string, string>>> {
+  const result: Array<Record<string, string>> = [];
+  for (const source of uploads) {
+    if (!source?.file) continue;
+    result.push({
+      sha256: await sha256Hex(await source.file.arrayBuffer()),
+      filename: String(source.file.name || source.name || ""),
+      content_type: String(source.file.type || ""),
+    });
+  }
+  return result;
+}
+
+async function currentGenerateRequestFingerprint(
+  prompt: string,
+  promptForModel: string,
+  uploads: any[],
+  galleries: any[],
+  assets: any[],
+): Promise<string> {
+  const params = currentTaskParams();
+  const payload = {
+    mode: "generate",
+    prompt,
+    prompt_for_model: promptForModel,
+    main_model: currentMainModel(),
+    model: params.model,
+    size: params.size,
+    resolution: params.resolution || "",
+    ratio: params.ratio || "",
+    orientation: params.orientation || "",
+    quality: params.quality,
+    output_format: params.output_format,
+    moderation: params.moderation,
+    output_compression: String(params.output_compression || ""),
+    n: params.n,
+    prompt_fidelity: currentPromptFidelity(),
+    web_search: Boolean(params.web_search),
+    api_provider_id: "yuanshu",
+    api_mode: "images",
+    codex_mode: "",
+    gallery_image_ids: dedupePreserveOrder(galleries.map((source: any) => source.id)),
+    reference_asset_ids: dedupePreserveOrder(assets.map((source: any) => source.id)),
+    upload_fingerprints: await uploadFileFingerprints(uploads),
+  };
+  return sha256Hex(canonicalJson(payload));
+}
+
+function activeTaskFingerprint(task: any): string {
+  return String(task?.request_fingerprint || task?.request?.webui_request_fingerprint || "");
+}
+
+function findActiveDuplicateTask(requestFingerprint: string): any | null {
+  if (!requestFingerprint) return null;
+  return (state.tasks || []).find((task: any) => (
+    ACTIVE_DEDUPLICATION_STATUSES.has(String(task?.status || ""))
+    && activeTaskFingerprint(task) === requestFingerprint
+  )) || null;
+}
+
+function focusDuplicateTask(task: any): void {
+  if (!task?.task_id) return;
+  state.selectedTaskId = task.task_id;
+  state.previewTask = task;
+  renderTasks();
+  renderPreview(task);
+}
 
 function isYuanshuMode(): boolean {
   return document.documentElement.dataset.yuanshuMode === "true";
@@ -237,12 +341,15 @@ function buildPreviewRequest() {
   return payload;
 }
 
-function createPendingTask() {
+function createPendingTask(requestFingerprint = "") {
   const taskId = `pending-${Date.now()}`;
   const now = new Date().toISOString();
   const localInputFiles = state.images.slice();
   const previewSource = localInputFiles[0];
   const request = buildPreviewRequest();
+  if (requestFingerprint) {
+    request.webui_request_fingerprint = requestFingerprint;
+  }
   return {
     task_id: taskId,
     local_pending: true,
@@ -251,6 +358,7 @@ function createPendingTask() {
     started_at: now,
     mode: state.mode,
     status: "submitting",
+    request_fingerprint: requestFingerprint,
     prompt: getPromptText(),
     prompt_for_model: currentPromptForModel(),
     requested_backend: request.requested_backend,
@@ -346,13 +454,29 @@ async function runTask() {
     return;
   }
 
+  let requestFingerprint = "";
+  if (yuanshuMode) {
+    try {
+      requestFingerprint = await currentGenerateRequestFingerprint(prompt, promptForModel, uploads, galleries, assets);
+      const duplicateTask = findActiveDuplicateTask(requestFingerprint);
+      if (duplicateTask) {
+        focusDuplicateTask(duplicateTask);
+        setStatus("相同参数的任务已经在提交或生成中，已切换到已有任务。", "ok");
+        return;
+      }
+      form.append("request_fingerprint", requestFingerprint);
+    } catch (error) {
+      console.warn("Failed to compute request fingerprint", error);
+    }
+  }
+
   if (yuanshuMode || state.mode === "generate") {
     uploads.forEach((source: any) => form.append("reference_images", source.file));
   } else {
     uploads.forEach((source: any) => form.append("images", source.file));
   }
 
-  const pendingTask = createPendingTask();
+  const pendingTask = createPendingTask(requestFingerprint);
   if (!yuanshuMode) {
     addPendingTask(pendingTask);
   }
@@ -390,7 +514,7 @@ async function runTask() {
       els.requestJson.textContent = JSON.stringify(data.request || {}, null, 2);
     }
     stopRunFeedback();
-    setStatus(translate("taskSubmit.queued"), "ok");
+    setStatus(data.duplicate ? "相同参数的任务已经在提交或生成中，已返回已有任务。" : translate("taskSubmit.queued"), "ok");
     await window.refreshQueue?.();
     await getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
     await refreshRecentAssets();

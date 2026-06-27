@@ -8,29 +8,33 @@ from fastapi.responses import FileResponse, Response
 from codex_image.webui.context import WebUIContext
 from codex_image.webui.storage import _guess_mime_type
 from codex_image.webui.task_metadata import _gallery_category_response, _gallery_item_response, _reference_asset_response
+from codex_image.webui.yuanshu_resources import yuanshu_gallery_storage
 from codex_image.webui.yuanshu_scope import current_yuanshu_owner_for_request, metadata_matches_current_yuanshu_owner
 
 
 def register_gallery_routes(app: FastAPI, ctx: WebUIContext) -> None:
     @app.get("/api/gallery")
-    def list_gallery(category: str | None = None) -> dict[str, Any]:
+    def list_gallery(request: Request, category: str | None = None) -> dict[str, Any]:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
         try:
-            items = ctx.gallery_storage.list_items(category=category)
+            items = gallery_storage.list_items(category=category)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {
             "items": [_gallery_item_response(item) for item in items],
-            "categories": [_gallery_category_response(category) for category in ctx.gallery_storage.list_categories()],
+            "categories": [_gallery_category_response(category) for category in gallery_storage.list_categories()],
         }
 
     @app.get("/api/gallery/categories")
-    def list_gallery_categories() -> dict[str, Any]:
-        return {"categories": [_gallery_category_response(category) for category in ctx.gallery_storage.list_categories()]}
+    def list_gallery_categories(request: Request) -> dict[str, Any]:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
+        return {"categories": [_gallery_category_response(category) for category in gallery_storage.list_categories()]}
 
     @app.post("/api/gallery/categories")
-    def create_gallery_category(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    def create_gallery_category(request: Request, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
         try:
-            category = ctx.gallery_storage.create_category(
+            category = gallery_storage.create_category(
                 name=str(payload["name"]),
                 prompt_role=str(payload["prompt_role"]) if "prompt_role" in payload else None,
                 order=int(payload["order"]) if "order" in payload and payload["order"] is not None else None,
@@ -40,17 +44,19 @@ def register_gallery_routes(app: FastAPI, ctx: WebUIContext) -> None:
         return {"category": _gallery_category_response(category)}
 
     @app.patch("/api/gallery/categories/reorder")
-    def reorder_gallery_categories(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    def reorder_gallery_categories(request: Request, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
         try:
-            categories = ctx.gallery_storage.reorder_categories(list(payload["category_ids"]))
+            categories = gallery_storage.reorder_categories(list(payload["category_ids"]))
         except (KeyError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"categories": [_gallery_category_response(category) for category in categories]}
 
     @app.patch("/api/gallery/categories/{category_id}")
-    def update_gallery_category(category_id: str, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    def update_gallery_category(category_id: str, request: Request, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
         try:
-            category = ctx.gallery_storage.update_category(
+            category = gallery_storage.update_category(
                 category_id,
                 name=str(payload["name"]) if "name" in payload else None,
                 prompt_role=str(payload["prompt_role"]) if "prompt_role" in payload else None,
@@ -63,9 +69,10 @@ def register_gallery_routes(app: FastAPI, ctx: WebUIContext) -> None:
         return {"category": _gallery_category_response(category)}
 
     @app.delete("/api/gallery/categories/{category_id}")
-    def delete_gallery_category(category_id: str, move_to: str | None = None) -> dict[str, Any]:
+    def delete_gallery_category(category_id: str, request: Request, move_to: str | None = None) -> dict[str, Any]:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
         try:
-            ctx.gallery_storage.delete_category(category_id, move_to=move_to)
+            gallery_storage.delete_category(category_id, move_to=move_to)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail="Gallery category not found") from exc
         except ValueError as exc:
@@ -74,18 +81,20 @@ def register_gallery_routes(app: FastAPI, ctx: WebUIContext) -> None:
 
     @app.post("/api/gallery")
     async def create_gallery_item(
+        request: Request,
         name: str = Form(...),
         category: str = Form(...),
         prompt_note: str | None = Form(None),
         image: UploadFile = File(...),
     ) -> dict[str, Any]:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
         data = await image.read()
         if not data:
             raise HTTPException(status_code=400, detail="Image is required")
         if image.content_type and not image.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail=f"Unsupported image type: {image.content_type}")
         try:
-            item = ctx.gallery_storage.create_item(
+            item = gallery_storage.create_item(
                 name=name,
                 category=category,
                 filename=image.filename or "image.png",
@@ -100,17 +109,19 @@ def register_gallery_routes(app: FastAPI, ctx: WebUIContext) -> None:
         return {"item": _gallery_item_response(item)}
 
     @app.patch("/api/gallery/reorder")
-    def reorder_gallery_items(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    def reorder_gallery_items(request: Request, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
         try:
-            items = ctx.gallery_storage.reorder_items(str(payload["category"]), list(payload["item_ids"]))
+            items = gallery_storage.reorder_items(str(payload["category"]), list(payload["item_ids"]))
         except (KeyError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"items": [_gallery_item_response(item) for item in items]}
 
     @app.patch("/api/gallery/{item_id}")
-    def update_gallery_item(item_id: str, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    def update_gallery_item(item_id: str, request: Request, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
         try:
-            item = ctx.gallery_storage.update_item(
+            item = gallery_storage.update_item(
                 item_id,
                 name=str(payload["name"]) if "name" in payload else None,
                 category=str(payload["category"]) if "category" in payload else None,
@@ -126,14 +137,15 @@ def register_gallery_routes(app: FastAPI, ctx: WebUIContext) -> None:
         return {"item": _gallery_item_response(item)}
 
     @app.put("/api/gallery/{item_id}/image")
-    async def replace_gallery_item_image(item_id: str, image: UploadFile = File(...)) -> dict[str, Any]:
+    async def replace_gallery_item_image(item_id: str, request: Request, image: UploadFile = File(...)) -> dict[str, Any]:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
         data = await image.read()
         if not data:
             raise HTTPException(status_code=400, detail="Image is required")
         if image.content_type and not image.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail=f"Unsupported image type: {image.content_type}")
         try:
-            item = ctx.gallery_storage.replace_item_image(
+            item = gallery_storage.replace_item_image(
                 item_id,
                 filename=image.filename or "image.png",
                 data=data,
@@ -146,18 +158,20 @@ def register_gallery_routes(app: FastAPI, ctx: WebUIContext) -> None:
         return {"item": _gallery_item_response(item)}
 
     @app.delete("/api/gallery/{item_id}")
-    def delete_gallery_item(item_id: str) -> dict[str, Any]:
+    def delete_gallery_item(item_id: str, request: Request) -> dict[str, Any]:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
         try:
-            ctx.gallery_storage.delete_item(item_id)
+            gallery_storage.delete_item(item_id)
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=404, detail="Gallery item not found") from exc
         return {"ok": True, "id": item_id}
 
     @app.get("/api/gallery/{item_id}/image")
-    def get_gallery_image(item_id: str) -> Response:
+    def get_gallery_image(item_id: str, request: Request) -> Response:
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
         try:
-            item = ctx.gallery_storage.read_item(item_id)
-            path = ctx.gallery_storage.image_path(item_id)
+            item = gallery_storage.read_item(item_id)
+            path = gallery_storage.image_path(item_id)
         except (FileNotFoundError, ValueError) as exc:
             raise HTTPException(status_code=404, detail="Gallery item not found") from exc
         return FileResponse(

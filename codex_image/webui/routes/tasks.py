@@ -31,6 +31,7 @@ from codex_image.webui.yuanshu_scope import (
     metadata_matches_current_yuanshu_owner,
     require_current_yuanshu_task,
 )
+from codex_image.webui.yuanshu_resources import yuanshu_gallery_storage
 
 
 def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
@@ -111,7 +112,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
         active_ids = h["visible_running_task_ids"]()
         return {
             "tasks": [
-                _with_file_urls(task, active_ids, ctx.gallery_storage, ctx.reference_asset_storage, include_request=False)
+                _with_file_urls(task, active_ids, yuanshu_gallery_storage(ctx, request), ctx.reference_asset_storage, include_request=False)
                 for task in filter_current_yuanshu_tasks(ctx, ctx.storage.list_tasks(), request)
             ]
         }
@@ -204,7 +205,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
                 "task": _with_file_urls(
                     metadata,
                     h["visible_running_task_ids"](),
-                    ctx.gallery_storage,
+                    yuanshu_gallery_storage(ctx, request),
                     ctx.reference_asset_storage,
                 )
             }
@@ -220,7 +221,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
             "task": _with_file_urls(
                 metadata,
                 h["visible_running_task_ids"](),
-                ctx.gallery_storage,
+                yuanshu_gallery_storage(ctx, request),
                 ctx.reference_asset_storage,
                 include_request=False,
             )
@@ -336,7 +337,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
                 "task": _with_file_urls(
                     metadata,
                     h["visible_running_task_ids"](),
-                    ctx.gallery_storage,
+                    yuanshu_gallery_storage(ctx, request),
                     ctx.reference_asset_storage,
                 )
             }
@@ -355,7 +356,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
                 "task": _with_file_urls(
                     metadata,
                     h["visible_running_task_ids"](),
-                    ctx.gallery_storage,
+                    yuanshu_gallery_storage(ctx, request),
                     ctx.reference_asset_storage,
                 )
             }
@@ -376,7 +377,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
                 "task": _with_file_urls(
                     metadata,
                     h["visible_running_task_ids"](),
-                    ctx.gallery_storage,
+                    yuanshu_gallery_storage(ctx, request),
                     ctx.reference_asset_storage,
                 )
             }
@@ -422,7 +423,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
             "task": _with_file_urls(
                 metadata,
                 h["visible_running_task_ids"](),
-                ctx.gallery_storage,
+                yuanshu_gallery_storage(ctx, request),
                 ctx.reference_asset_storage,
             )
         }
@@ -449,7 +450,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
             "task": _with_file_urls(
                 metadata,
                 h["visible_running_task_ids"](),
-                ctx.gallery_storage,
+                yuanshu_gallery_storage(ctx, request),
                 ctx.reference_asset_storage,
             )
         }

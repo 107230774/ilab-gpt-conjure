@@ -167,7 +167,7 @@ from .task_metadata import (
     _write_queued_metadata,
     _write_running_metadata,
 )
-from .yuanshu_scope import current_yuanshu_owner_for_request, metadata_matches_current_yuanshu_owner
+from .yuanshu_scope import current_yuanshu_owner_for_request, current_yuanshu_session, metadata_matches_current_yuanshu_owner
 
 ClientFactory = Callable[[], Any]
 AuthChecker = Callable[[], bool]
@@ -220,6 +220,19 @@ def _yuanshu_public_api_blocked(method: str, path: str) -> bool:
     if normalized.startswith("/api/tasks/") and normalized.endswith("/reveal-output") and verb == "POST":
         return True
     return False
+
+
+def _yuanshu_public_user_resource_operation(method: str, path: str) -> bool:
+    normalized = _normalize_yuanshu_api_path(path)
+    verb = str(method or "").upper()
+    if verb not in {"POST", "PATCH", "PUT", "DELETE"}:
+        return False
+    return (
+        normalized.startswith("/api/gallery")
+        or normalized.startswith("/api/prompt-snippets")
+        or normalized.startswith("/api/prompt-templates")
+        or normalized.startswith("/api/prompt-template-categories")
+    )
 
 
 def create_app(
@@ -283,6 +296,12 @@ def create_app(
     async def no_store_yuanshu_dynamic_responses(request: Request, call_next: Callable[[Request], Any]) -> Response:
         path = request.url.path
         if _yuanshu_public_mode_enabled() and _yuanshu_public_api_blocked(request.method, path):
+            if _yuanshu_public_user_resource_operation(request.method, path) and current_yuanshu_session(ctx, request) is not None:
+                response = await call_next(request)
+                response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+                response.headers["Pragma"] = "no-cache"
+                response.headers["Expires"] = "0"
+                return response
             return JSONResponse(
                 {"detail": "This management operation is disabled in Yuanshu public mode"},
                 status_code=403,

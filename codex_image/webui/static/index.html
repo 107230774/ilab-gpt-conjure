@@ -77,7 +77,7 @@
         document.documentElement.dataset.locale = locale;
       })();
     </script>
-    <link rel="stylesheet" href="/image-playground/static/styles.css?v=runtime-384" />
+    <link rel="stylesheet" href="/image-playground/static/styles.css?v=runtime-385" />
   </head>
   <body>
     <div class="layout-container">
@@ -612,15 +612,15 @@
                   <div class="field quality-field">
                     <span data-i18n="output.quality">质量</span>
                     <div class="radio-group">
-                      <button class="radio-btn active" data-val="auto" type="button" data-i18n="output.qualityAuto">自动</button>
+                      <button class="radio-btn" data-val="auto" type="button" data-i18n="output.qualityAuto">自动</button>
                       <button class="radio-btn" data-val="low" type="button" data-i18n="output.qualityLow">低</button>
-                      <button class="radio-btn" data-val="medium" type="button" data-i18n="output.qualityMedium">中</button>
+                      <button class="radio-btn active" data-val="medium" type="button" data-i18n="output.qualityMedium">中</button>
                       <button class="radio-btn" data-val="high" type="button" data-i18n="output.qualityHigh">高</button>
                     </div>
                     <select id="quality" class="hidden">
                       <option value="auto" data-i18n="output.qualityAuto">自动</option>
                       <option value="low" data-i18n="output.qualityLow">低</option>
-                      <option value="medium" data-i18n="output.qualityMedium">中</option>
+                      <option value="medium" data-i18n="output.qualityMedium" selected>中</option>
                       <option value="high" data-i18n="output.qualityHigh">高</option>
                     </select>
                   </div>
@@ -1199,7 +1199,7 @@
     </div>
 
     <div id="taskNotificationToastRegion" class="task-notification-toast-region" aria-live="polite"></div>
-  <script src="/image-playground/static/app.js?v=runtime-384"></script>
+  <script src="/image-playground/static/app.js?v=runtime-385"></script>
     <script>
       (() => {
         document.querySelectorAll(".radio-group").forEach((group) => {

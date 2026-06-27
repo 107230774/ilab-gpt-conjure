@@ -315,7 +315,7 @@ function resetForm() {
   if (els.ratio) els.ratio.value = "1:1";
   if (els.orientation) els.orientation.value = "square";
   els.size.value = "1024x1024";
-  els.quality.value = "auto";
+  els.quality.value = "medium";
   els.outputFormat.value = "png";
   els.moderation.value = "auto";
   els.compression.value = "80";

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -20,10 +22,12 @@ from codex_image.webui.executor import (
 from codex_image.webui.prompt_ratio import append_ratio_prompt_instruction
 from codex_image.webui.storage import utc_now
 from codex_image.webui.task_metadata import _dedupe_preserve_order, _params, _reference_asset_response, _with_file_urls, _write_queued_metadata
+from codex_image.webui.yuanshu_resources import yuanshu_gallery_storage
 from codex_image.webui.yuanshu_scope import current_yuanshu_owner_for_request, current_yuanshu_session, stamp_current_yuanshu_owner
 from codex_image.webui.yuanshu import verify_yuanshu_token
 
 DEFAULT_PROMPT_FIDELITY = "strict"
+ACTIVE_DEDUPLICATION_STATUSES = {"submitting", "queued", "running"}
 YUANSHU_ALLOWED_RESOLUTIONS = {"auto", "standard", "2k"}
 YUANSHU_ALLOWED_SIZES = {
     "auto",
@@ -100,6 +104,98 @@ def _reference_asset_matches_current_owner(item: dict[str, Any], owner: dict[str
     return any(_owner_matches_current_user(candidate, owner) for candidate in candidates)
 
 
+async def _upload_file_fingerprints(files: list[UploadFile]) -> list[dict[str, str]]:
+    fingerprints: list[dict[str, str]] = []
+    for upload in files:
+        data = await upload.read()
+        await upload.seek(0)
+        if not data:
+            continue
+        fingerprints.append(
+            {
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "filename": str(upload.filename or "image.png"),
+                "content_type": str(upload.content_type or ""),
+            }
+        )
+    return fingerprints
+
+
+def _request_fingerprint(payload: dict[str, Any]) -> str:
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _generate_request_fingerprint_payload(
+    *,
+    prompt: str,
+    prompt_for_model: str,
+    main_model: str,
+    model: str,
+    size: str,
+    resolution: str | None,
+    ratio: str | None,
+    orientation: str | None,
+    quality: str,
+    output_format: str,
+    moderation: str | None,
+    output_compression: str | None,
+    n: int,
+    prompt_fidelity: str,
+    web_search: bool,
+    api_provider_id: str | None,
+    api_mode: str | None,
+    codex_mode: str | None,
+    gallery_image_ids: list[str],
+    reference_asset_ids: list[str],
+    upload_fingerprints: list[dict[str, str]],
+) -> dict[str, Any]:
+    return {
+        "mode": "generate",
+        "prompt": str(prompt or ""),
+        "prompt_for_model": str(prompt_for_model or ""),
+        "main_model": str(main_model or ""),
+        "model": str(model or ""),
+        "size": str(size or ""),
+        "resolution": str(resolution or ""),
+        "ratio": str(ratio or ""),
+        "orientation": str(orientation or ""),
+        "quality": str(quality or ""),
+        "output_format": str(output_format or ""),
+        "moderation": str(moderation or ""),
+        "output_compression": str(output_compression or ""),
+        "n": int(n),
+        "prompt_fidelity": str(prompt_fidelity or ""),
+        "web_search": bool(web_search),
+        "api_provider_id": str(api_provider_id or ""),
+        "api_mode": str(api_mode or ""),
+        "codex_mode": str(codex_mode or ""),
+        "gallery_image_ids": list(gallery_image_ids),
+        "reference_asset_ids": list(reference_asset_ids),
+        "upload_fingerprints": list(upload_fingerprints),
+    }
+
+
+def _find_active_duplicate_task(ctx: WebUIContext, owner: dict[str, Any] | None, request_fingerprint: str) -> dict[str, Any] | None:
+    owner_user_id = str(owner.get("user_id") or "") if owner is not None else ""
+    if not owner_user_id or not request_fingerprint:
+        return None
+    for candidate in ctx.storage.list_recent_tasks(limit=500, yuanshu_user_id=owner_user_id):
+        task_id = str(candidate.get("task_id") or "")
+        if not task_id:
+            continue
+        try:
+            metadata = ctx.storage.read_metadata(task_id)
+        except (FileNotFoundError, OSError, ValueError):
+            continue
+        if str(metadata.get("request_fingerprint") or "") != request_fingerprint:
+            continue
+        if str(metadata.get("status") or "") in ACTIVE_DEDUPLICATION_STATUSES:
+            metadata["task_id"] = str(metadata.get("task_id") or task_id)
+            return metadata
+    return None
+
+
 def _resolve_owned_reference_assets(ctx: WebUIContext, request: Request, asset_ids: list[str]) -> tuple[list[dict[str, Any]], list[str]]:
     owner = current_yuanshu_owner_for_request(ctx, request)
     if owner is None:
@@ -160,9 +256,51 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
             await _verify_yuanshu_session_token(yuanshu_session, ctx)
             size, resolution, n = _enforce_yuanshu_generation_limits(size, resolution, n)
 
-        gallery_refs, gallery_data_urls = _resolve_gallery_refs(ctx.gallery_storage, gallery_image_ids or [])
+        owner = current_yuanshu_owner_for_request(ctx, request)
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
+        clean_gallery_image_ids = _dedupe_preserve_order(gallery_image_ids or [])
+        clean_reference_asset_ids = _dedupe_preserve_order(reference_asset_ids or [])
+        upload_fingerprints = await _upload_file_fingerprints(reference_images or [])
+        request_fingerprint = _request_fingerprint(
+            _generate_request_fingerprint_payload(
+                prompt=prompt,
+                prompt_for_model=prompt_for_model or prompt,
+                main_model=main_model,
+                model=model,
+                size=size,
+                resolution=resolution,
+                ratio=ratio,
+                orientation=orientation,
+                quality=quality,
+                output_format=output_format,
+                moderation=moderation,
+                output_compression=output_compression,
+                n=n,
+                prompt_fidelity=prompt_fidelity,
+                web_search=web_search,
+                api_provider_id="yuanshu" if yuanshu_session is not None else api_provider_id,
+                api_mode="images" if yuanshu_session is not None else api_mode,
+                codex_mode=codex_mode,
+                gallery_image_ids=clean_gallery_image_ids,
+                reference_asset_ids=clean_reference_asset_ids,
+                upload_fingerprints=upload_fingerprints,
+            )
+        )
+        duplicate_task = _find_active_duplicate_task(ctx, owner, request_fingerprint)
+        if duplicate_task is not None:
+            try:
+                duplicate_request = ctx.storage.read_request(str(duplicate_task["task_id"]))
+            except (FileNotFoundError, OSError, ValueError):
+                duplicate_request = {}
+            return {
+                "task": _with_file_urls(duplicate_task, ctx.active_task_ids, gallery_storage, ctx.reference_asset_storage),
+                "request": duplicate_request,
+                "duplicate": True,
+            }
+
+        gallery_refs, gallery_data_urls = _resolve_gallery_refs(gallery_storage, clean_gallery_image_ids)
         uploaded_assets = await h["save_reference_assets"](reference_images or [], request=request)
-        selected_assets, _ = _resolve_owned_reference_assets(ctx, request, reference_asset_ids or [])
+        selected_assets, _ = _resolve_owned_reference_assets(ctx, request, clean_reference_asset_ids)
         reference_assets = h["dedupe_reference_assets"](uploaded_assets + selected_assets)
         task = ctx.storage.create_task("generate")
         created_at = utc_now()
@@ -232,6 +370,7 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
             gallery_refs=gallery_refs,
             reference_assets=reference_assets,
         )
+        stored_request_payload["webui_request_fingerprint"] = request_fingerprint
         stored_request_payload["webui_requested_backend"] = requested_backend
         if effective_api_provider_id is not None:
             stored_request_payload["webui_api_provider_id"] = effective_api_provider_id
@@ -276,12 +415,13 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
             requested_backend=requested_backend,
             max_attempts=ctx.queue_manager.max_attempts if ctx.queue_manager is not None else 1,
         )
+        metadata["request_fingerprint"] = request_fingerprint
         metadata = stamp_current_yuanshu_owner(ctx, metadata, request)
         ctx.storage.write_metadata(task.task_id, metadata)
         ctx.queue_storage.enqueue(task.task_id)
         h["ensure_queue_worker_running"]()
         return {
-            "task": _with_file_urls(metadata, ctx.active_task_ids, ctx.gallery_storage, ctx.reference_asset_storage),
+            "task": _with_file_urls(metadata, ctx.active_task_ids, gallery_storage, ctx.reference_asset_storage),
             "request": stored_request_payload,
         }
 
@@ -324,7 +464,8 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
 
         if not images and not _dedupe_preserve_order(gallery_image_ids or []) and not _dedupe_preserve_order(reference_asset_ids or []):
             raise HTTPException(status_code=400, detail="At least one image is required")
-        gallery_refs, gallery_data_urls = _resolve_gallery_refs(ctx.gallery_storage, gallery_image_ids or [])
+        gallery_storage = yuanshu_gallery_storage(ctx, request)
+        gallery_refs, gallery_data_urls = _resolve_gallery_refs(gallery_storage, gallery_image_ids or [])
         uploaded_assets = await h["save_reference_assets"](images or [])
         selected_assets, _ = _resolve_reference_assets(ctx.reference_asset_storage, reference_asset_ids or [])
         reference_assets = h["dedupe_reference_assets"](uploaded_assets + selected_assets)
@@ -448,6 +589,6 @@ def register_generation_routes(app: FastAPI, ctx: WebUIContext) -> None:
         ctx.queue_storage.enqueue(task.task_id)
         h["ensure_queue_worker_running"]()
         return {
-            "task": _with_file_urls(metadata, ctx.active_task_ids, ctx.gallery_storage, ctx.reference_asset_storage),
-            "request": stored_request_payload,
-        }
+                "task": _with_file_urls(metadata, ctx.active_task_ids, gallery_storage, ctx.reference_asset_storage),
+                "request": stored_request_payload,
+            }

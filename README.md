@@ -42,6 +42,9 @@ Images API 或 Responses API 形态。
 
 免安装一键包下载见 [下载 / Releases](RELEASES.md)。
 
+Yuanshu 在线生图部署、发布、回滚和当前线上状态见
+[Yuanshu Image Playground Runbook](docs/YUANSHU_IMAGE_PLAYGROUND_RUNBOOK.md)。
+
 ## 功能
 
 - 面向 GPT-image-2 的文生图、参考图生成和图像编辑工作流。

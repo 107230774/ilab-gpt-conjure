@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import secrets
 from typing import Any
 
@@ -107,7 +108,7 @@ def stamp_current_yuanshu_owner(ctx: WebUIContext, metadata: dict[str, Any], req
 def metadata_matches_current_yuanshu_owner(ctx: WebUIContext, metadata: dict[str, Any], request: Request | None = None) -> bool:
     owner = current_yuanshu_owner_for_request(ctx, request)
     if owner is None:
-        return False
+        return not _yuanshu_public_mode_enabled()
     task_owner = metadata.get(YUANSHU_OWNER_KEY)
     if not isinstance(task_owner, dict):
         return False
@@ -119,7 +120,7 @@ def metadata_matches_current_yuanshu_owner(ctx: WebUIContext, metadata: dict[str
 
 def filter_current_yuanshu_tasks(ctx: WebUIContext, tasks: list[dict[str, Any]], request: Request | None = None) -> list[dict[str, Any]]:
     if current_yuanshu_owner_for_request(ctx, request) is None:
-        return []
+        return [] if _yuanshu_public_mode_enabled() else tasks
     return [task for task in tasks if metadata_matches_current_yuanshu_owner(ctx, task, request)]
 
 
@@ -131,6 +132,11 @@ def require_current_yuanshu_task(ctx: WebUIContext, task_id: str, request: Reque
     if not metadata_matches_current_yuanshu_owner(ctx, metadata, request):
         raise HTTPException(status_code=404, detail="Task not found") from None
     return metadata
+
+
+def _yuanshu_public_mode_enabled() -> bool:
+    raw = os.getenv("YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE", "true").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
 
 
 def _int_or_none(value: Any) -> int | None:

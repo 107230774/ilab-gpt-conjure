@@ -51,6 +51,64 @@ from tests.webui_helpers import (
 
 
 class WebUIGalleryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._public_mode_patch = patch.dict(os.environ, {"YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE": "false"})
+        self._public_mode_patch.start()
+
+    def tearDown(self) -> None:
+        self._public_mode_patch.stop()
+
+    def _add_yuanshu_session(self, app, session_id: str, *, user_id: int, key_id: int) -> dict[str, str]:
+        app.state.ctx.yuanshu_sessions[session_id] = {
+            "token": f"token-{session_id}",
+            "key_id": key_id,
+            "user_id": user_id,
+            "session_token_id": f"session-token-{session_id}",
+        }
+        return {"X-Yuanshu-Session": session_id}
+
+    def test_public_mode_gallery_write_requires_session_and_uses_user_scope(self) -> None:
+        from codex_image.webui.app import create_app
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE": "true"}):
+            root = Path(tmp)
+            app = create_app(
+                output_root=root / "tasks",
+                gallery_root=root / "gallery",
+                source_data_root=root / "source-data",
+                client_factory=lambda: FakeImageClient(),
+                auth_checker=lambda: True,
+                auto_start_queue=False,
+            )
+            client = TestClient(app)
+            user_a = self._add_yuanshu_session(app, "session-a", user_id=101, key_id=1)
+            user_a_new_key = self._add_yuanshu_session(app, "session-a-new-key", user_id=101, key_id=2)
+            user_b = self._add_yuanshu_session(app, "session-b", user_id=202, key_id=1)
+
+            forbidden = client.post(
+                "/api/gallery",
+                data={"name": "未登录", "category": "portrait"},
+                files={"image": ("blocked.png", b"blocked", "image/png")},
+            )
+            created = client.post(
+                "/api/gallery",
+                data={"name": "用户 A 头像", "category": "portrait"},
+                files={"image": ("portrait.png", b"user-a-image", "image/png")},
+                headers=user_a,
+            )
+            item = created.json()["item"]
+            same_user_items = client.get("/api/gallery", headers=user_a_new_key).json()["items"]
+            other_user_items = client.get("/api/gallery", headers=user_b).json()["items"]
+            same_user_image = client.get(item["image_url"], headers=user_a_new_key)
+            other_user_image = client.get(item["image_url"], headers=user_b)
+
+        self.assertEqual(forbidden.status_code, 403)
+        self.assertEqual(created.status_code, 200)
+        self.assertEqual([item["id"] for item in same_user_items], [item["id"]])
+        self.assertEqual(other_user_items, [])
+        self.assertEqual(same_user_image.content, b"user-a-image")
+        self.assertEqual(other_user_image.status_code, 404)
+
     def test_gallery_crud_routes_manage_public_library(self) -> None:
         from codex_image.webui.app import create_app
 
