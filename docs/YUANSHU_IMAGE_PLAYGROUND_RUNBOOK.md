@@ -1,6 +1,6 @@
 # Yuanshu Image Playground Runbook
 
-Last updated: 2026-06-26 11:45 CST
+Last updated: 2026-06-27 18:35 CST
 
 This file is the project-local source of truth for Yuanshu online image playground development, release, deployment, rollback, and production status. Future work in this repository should read this file first instead of depending on Sub2API-side deployment notes.
 
@@ -81,6 +81,12 @@ Frontend source files live under:
 - generated static assets under `codex_image/webui/static/`
 
 For TypeScript or CSS changes, generated static assets must be committed with the source changes.
+
+Cache-bump rule:
+
+- If `codex_image/webui/static/app.js`, `history.js`, or `styles.css` changes, bump the matching query string in `codex_image/webui/static/index.html` before packaging.
+- Do this before the deployment build, not as a production hotfix after cutover. Yuan Nginx and browsers cache `/image-playground/static/*`, so unchanged runtime query strings can keep serving the old bundle even when the container has the new files.
+- Example: when `app.js` changes, advance `/image-playground/static/app.js?v=runtime-385` to `runtime-386` and verify the public page references the new value after deploy.
 
 Primary validation:
 
