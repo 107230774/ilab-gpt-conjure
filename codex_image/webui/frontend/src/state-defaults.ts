@@ -58,6 +58,7 @@ export function createDefaultState(): WebUIState {
   selectedPromptTemplateId: null,
   recentAssets: [],
   collectedReferences: [],
+  pendingReferenceAdds: [],
   galleryCategories: defaultGalleryCategories(),
   activeGalleryCategory: "portrait",
   hoveredGalleryItemId: null,

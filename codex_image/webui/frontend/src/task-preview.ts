@@ -506,6 +506,28 @@ function bindPreviewGridEvents() {
   els.previewGrid.addEventListener("click", handlePreviewGridClick);
 }
 
+async function addPreviewOutputToInput(addButton: HTMLButtonElement) {
+  const url = addButton.dataset.addInputUrl || "";
+  if (!url) return;
+  if (addButton.disabled) {
+    setStatus(translate("referenceCollector.addingDuplicate"), "ok");
+    return;
+  }
+  const label = addButton.textContent || translate("preview.addReference");
+  addButton.disabled = true;
+  addButton.classList.add("is-pending");
+  addButton.setAttribute("aria-busy", "true");
+  addButton.textContent = translate("preview.addingReference");
+  try {
+    await window.addToInput?.(url);
+  } finally {
+    addButton.disabled = false;
+    addButton.classList.remove("is-pending");
+    addButton.removeAttribute("aria-busy");
+    addButton.textContent = label;
+  }
+}
+
 function handlePreviewGridClick(event: any) {
   const target = event.target instanceof Element ? event.target : null;
   if (!target) return;
@@ -530,9 +552,9 @@ function handlePreviewGridClick(event: any) {
     void updateTaskOutputSelection(taskId, outputIndex, selected);
     return;
   }
-  const addButton = target.closest("[data-add-input-url]") as HTMLElement | null;
+  const addButton = target.closest("[data-add-input-url]") as HTMLButtonElement | null;
   if (addButton) {
-    void window.addToInput?.(addButton.dataset.addInputUrl || "");
+    void addPreviewOutputToInput(addButton);
     return;
   }
   const collectButton = target.closest("[data-collect-input-url]") as HTMLElement | null;

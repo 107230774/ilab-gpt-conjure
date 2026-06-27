@@ -17,6 +17,7 @@ function clearImages() {
   const state = getState();
   legacyMethod("revokeUploadPreviewUrls", state.images);
   state.images = [];
+  state.pendingReferenceAdds = [];
   legacyMethod("syncPromptGalleryMentionsFromInputs");
   legacyMethod("setMode", "generate");
   renderImageStrip();
@@ -101,7 +102,7 @@ function renderImageStrip() {
   thumbList.innerHTML = "";
   state.images.forEach((source: any, index: number) => {
     const wrapper = document.createElement("div");
-    wrapper.className = `thumb ${source.kind === "gallery" ? "gallery-thumb" : source.kind === "asset" ? "asset-thumb" : "upload-thumb"}${source.missing ? " missing-thumb" : ""}`;
+    wrapper.className = `thumb ${source.kind === "gallery" ? "gallery-thumb" : source.kind === "asset" ? "asset-thumb" : source.kind === "pending-reference" ? "pending-reference-thumb" : "upload-thumb"}${source.missing ? " missing-thumb" : ""}`;
     const image = document.createElement("img");
     const previewUrl = legacyMethod("sourcePreviewUrl", source);
     if (previewUrl) {
@@ -117,7 +118,9 @@ function renderImageStrip() {
       image.alt = "";
       wrapper.classList.add("missing-thumb");
     }, { once: true });
-    wrapper.title = source.missing
+    wrapper.title = source.kind === "pending-reference"
+      ? translate("referenceCollector.adding")
+      : source.missing
       ? (source.kind === "asset" ? translate("imageInput.deletedRecent") : translate("imageInput.deletedGallery"))
       : legacyMethod("sourceName", source);
     if (legacyMethod("isEditableImageSource", source)) {
@@ -143,7 +146,9 @@ function renderImageStrip() {
       ? legacyMethod("categoryLabel", source.category)
       : source.kind === "asset"
         ? translate("imageInput.recentBadge")
-        : translate("imageInput.uploadBadge");
+        : source.kind === "pending-reference"
+          ? translate("referenceCollector.pendingBadge")
+          : translate("imageInput.uploadBadge");
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "thumb-remove";
@@ -154,6 +159,9 @@ function renderImageStrip() {
       event.stopPropagation();
       const removedSource = state.images[index];
       legacyMethod("revokeUploadPreviewUrl", removedSource, { ignoredCurrentSources: new Set([removedSource]) });
+      if (removedSource?.kind === "pending-reference") {
+        state.pendingReferenceAdds = (state.pendingReferenceAdds || []).filter((item: any) => item.id !== removedSource.id);
+      }
       state.images.splice(index, 1);
       legacyMethod("syncPromptGalleryMentionsFromInputs");
       if (!state.images.length) {

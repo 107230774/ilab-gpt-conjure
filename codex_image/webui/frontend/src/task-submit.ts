@@ -41,6 +41,7 @@ function currentTaskParams(...args: any[]) { return legacyMethod("currentTaskPar
 function uploadInputs(...args: any[]) { return legacyMethod("uploadInputs", ...args); }
 function galleryInputs(...args: any[]) { return legacyMethod("galleryInputs", ...args); }
 function referenceAssetInputs(...args: any[]) { return legacyMethod("referenceAssetInputs", ...args); }
+function pendingReferenceInputs(...args: any[]) { return legacyMethod("pendingReferenceInputs", ...args); }
 function currentAuthSource(...args: any[]) { return legacyMethod("currentAuthSource", ...args); }
 function backendForAuthSource(...args: any[]) { return legacyMethod("backendForAuthSource", ...args); }
 function currentApiMode(...args: any[]) { return legacyMethod("currentApiMode", ...args); }
@@ -395,7 +396,12 @@ async function runTask() {
   const uploads = uploadInputs();
   const galleries = galleryInputs();
   const assets = referenceAssetInputs();
+  const pendingReferences = pendingReferenceInputs();
   const yuanshuMode = isYuanshuMode();
+  if (pendingReferences.length) {
+    setStatus(translate("referenceCollector.waitForPending"), "error");
+    return;
+  }
   if (missingGalleryInputs().length) {
     setStatus(translate("status.missingGalleryReference"), "error");
     return;

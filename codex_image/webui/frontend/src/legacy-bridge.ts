@@ -57,10 +57,12 @@ export interface LegacyMethods {
   galleryInputs(): any[];
   referenceAssetInputs(): any[];
   uploadInputs(): any[];
+  pendingReferenceInputs(): any[];
   missingGalleryInputs(): any[];
   missingReferenceAssetInputs(): any[];
   addReferenceAssetInput(item: any): void;
   collectReferenceOutput(url: string, options?: any): void;
+  addPreviewReferenceToInput(url: string, options?: any): Promise<any>;
   renderReferenceCollector(): void;
   addPendingTask(task: WebUITask): void;
   replacePendingTask(pendingTaskId: string, completedTask: WebUITask): void;

@@ -226,8 +226,7 @@ function closeLightbox(): void {
 
 async function addToInput(url: string): Promise<void> {
   try {
-    const file = await legacyMethod("imageFileFromUrl", url, "preview-" + Date.now());
-    legacyMethod("addImageFiles", [file]);
+    await legacyMethod("addPreviewReferenceToInput", url, { filename: "preview-" + Date.now() });
   } catch (error) {
     console.error("Failed to add image to input", error);
   }

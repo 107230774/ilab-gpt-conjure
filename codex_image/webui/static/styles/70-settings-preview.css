@@ -1234,6 +1234,15 @@ input[type=range].slider:disabled::-moz-range-thumb {
   transform: translateY(-1px);
 }
 
+.add-to-input-btn:disabled,
+.add-to-input-btn.is-pending {
+  cursor: progress;
+  opacity: 0.82;
+  transform: none;
+  background: color-mix(in srgb, var(--primary) 78%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 78%, var(--surface));
+}
+
 .collect-input-btn {
   color: var(--text-secondary);
   border-color: color-mix(in srgb, var(--line) 64%, var(--primary-light));

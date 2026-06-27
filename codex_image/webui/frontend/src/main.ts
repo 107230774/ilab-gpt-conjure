@@ -41,6 +41,7 @@ import { initLightboxFeature } from "./lightbox";
 import { initializeQueueFeature } from "./queue";
 import { initSegmentedIndicatorFeature } from "./segmented-indicator";
 import { initI18nFeature } from "./i18n";
+import { initUserGuideFeature } from "./user-guide";
 import { initYuanshuModeFeature } from "./yuanshu";
 
 cleanupLegacyYuanshuServiceWorker();
@@ -86,4 +87,5 @@ initLightboxFeature();
 initializeQueueFeature();
 initSegmentedIndicatorFeature();
 window.__codexImageWebUI?.boot();
+initUserGuideFeature();
 initYuanshuModeFeature();

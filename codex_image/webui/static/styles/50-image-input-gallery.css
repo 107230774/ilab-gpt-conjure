@@ -110,17 +110,20 @@
 
 .reference-collector {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
   z-index: 20;
   display: grid;
-  gap: 8px;
-  max-width: calc(100% - 16px);
-  padding: 8px;
-  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  box-shadow: var(--shadow-popover);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  max-width: none;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 95%, var(--primary-light));
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--code) 16%, transparent);
   backdrop-filter: blur(10px);
 }
 
@@ -158,7 +161,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  max-width: min(360px, calc(100vw - 48px));
+  max-width: min(260px, calc(100vw - 48px));
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -197,6 +200,27 @@
   color: #fff;
   cursor: pointer;
   line-height: 1;
+}
+
+.pending-reference-thumb {
+  opacity: 0.82;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.pending-reference-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      110deg,
+      transparent 0%,
+      color-mix(in srgb, var(--surface) 46%, transparent) 44%,
+      transparent 82%
+    );
+  background-size: 220% 100%;
+  animation: preview-loading-sheen 1.25s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .image-strip {

@@ -29,6 +29,17 @@ function uploadSource(file: File) {
   };
 }
 
+function pendingReferenceSource(url: string, id: string, name = "") {
+  return {
+    kind: "pending-reference",
+    id,
+    name: name || translate("referenceCollector.pendingName"),
+    previewUrl: url,
+    image_url: url,
+    pending: true,
+  };
+}
+
 function referenceAssetImageUrl(item: any): string {
   const explicitUrl = item?.image_url || item?.previewUrl || item?.preview_url || item?.thumbnail_url || "";
   if (explicitUrl) return yuanshuPath(explicitUrl);
@@ -75,6 +86,7 @@ function assetSource(item: any) {
 function sourcePreviewUrl(source: any) {
   if (!source) return "";
   if (source.kind === "upload") return source.previewUrl || yuanshuPath(source.image_url || source.preview_url || "");
+  if (source.kind === "pending-reference") return yuanshuPath(source.previewUrl || source.image_url || "");
   if (source.kind === "asset") return referenceAssetImageUrl(source);
   return yuanshuPath(source.image_url || source.previewUrl || source.preview_url || source.thumbnail_url || "");
 }
@@ -137,6 +149,7 @@ function revokeTaskUploadPreviewUrls(task: any) {
 function sourceName(source: any) {
   if (!source) return "";
   if (source.kind === "upload") return source.name || source.file?.name || translate("inputSource.uploadFallback");
+  if (source.kind === "pending-reference") return source.name || translate("referenceCollector.pendingName");
   if (source.kind === "asset") return source.name || source.filename || translate("recentAssets.defaultName");
   return source.name || translate("inputSource.galleryFallback");
 }
@@ -167,6 +180,10 @@ function referenceAssetInputs() {
 
 function uploadInputs() {
   return getState().images.filter((image: any) => image.kind === "upload");
+}
+
+function pendingReferenceInputs() {
+  return getState().images.filter((image: any) => image.kind === "pending-reference");
 }
 
 function addImageFiles(files: any, options: any = {}) {
@@ -381,7 +398,7 @@ function collectReferenceOutput(url: string, options: any = {}) {
     outputIndex: options.outputIndex || null,
   });
   renderReferenceCollector();
-  setStatus(formatTranslation("referenceCollector.staged", { count: state.collectedReferences.length }), "ok");
+  setStatus(formatTranslation("referenceCollector.stagedAction", { count: state.collectedReferences.length }), "ok");
 }
 
 function renderReferenceCollector() {
@@ -467,6 +484,61 @@ async function imageFileFromUrl(url: string, fallbackName: string) {
   return new File([blob], filename, { type });
 }
 
+function removePendingReferenceAdd(id: string) {
+  const state = getState();
+  state.pendingReferenceAdds = (state.pendingReferenceAdds || []).filter((item: any) => item.id !== id);
+}
+
+function hasPendingReferenceUrl(url: string) {
+  return (getState().pendingReferenceAdds || []).some((item: any) => item.url === url);
+}
+
+async function addPreviewReferenceToInput(url: string, options: any = {}) {
+  const state = getState();
+  const normalizedUrl = String(url || "").trim();
+  if (!normalizedUrl) return { ok: false };
+  if (hasPendingReferenceUrl(normalizedUrl)) {
+    setStatus(translate("referenceCollector.addingDuplicate"), "ok");
+    return { ok: true, duplicate: true };
+  }
+
+  const id = `pending-reference-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const placeholder = pendingReferenceSource(normalizedUrl, id, options.name || "");
+  state.pendingReferenceAdds = [...(state.pendingReferenceAdds || []), { id, url: normalizedUrl }];
+  state.images.push(placeholder);
+  if (state.mode !== "edit") {
+    legacyMethod("setMode", "edit");
+  }
+  legacyMethod("renderImageStrip");
+  legacyMethod("updateRequestPreview");
+  setStatus(translate("referenceCollector.adding"), "ok");
+
+  try {
+    const file = await imageFileFromUrl(normalizedUrl, options.filename || `preview-${Date.now()}`);
+    const pendingStillActive = (state.pendingReferenceAdds || []).some((item: any) => item.id === id);
+    const placeholderIndex = state.images.findIndex((source: any) => source?.kind === "pending-reference" && source.id === id);
+    if (!pendingStillActive || placeholderIndex === -1) {
+      return { ok: false, cancelled: true };
+    }
+    state.images.splice(placeholderIndex, 1, uploadSource(file));
+    if (state.mode !== "edit") {
+      legacyMethod("setMode", "edit");
+    }
+    legacyMethod("renderImageStrip");
+    legacyMethod("updateRequestPreview");
+    setStatus(translate("referenceCollector.addedOne"), "ok");
+    return { ok: true };
+  } catch (error: any) {
+    state.images = state.images.filter((source: any) => !(source?.kind === "pending-reference" && source.id === id));
+    legacyMethod("renderImageStrip");
+    legacyMethod("updateRequestPreview");
+    setStatus(error.message || translate("referenceCollector.addOneFailed"), "error");
+    return { ok: false, error };
+  } finally {
+    removePendingReferenceAdd(id);
+  }
+}
+
 function collectedReferenceFilename(item: any, index: number) {
   return ensureImageFilenameExtension(item?.name || `collected-reference-${index + 1}`, "image/png");
 }
@@ -481,6 +553,9 @@ async function addCollectedReferencesToInput() {
   try {
     const files: File[] = [];
     for (const [index, item] of items.entries()) {
+      if (addButton) {
+        addButton.textContent = formatTranslation("referenceCollector.addingAll", { current: index + 1, total: items.length });
+      }
       files.push(await imageFileFromUrl(item.url, collectedReferenceFilename(item, index)));
     }
     const added = addImageFiles(files, {
@@ -544,6 +619,7 @@ export function initInputSourcesFeature() {
     galleryInputs,
     referenceAssetInputs,
     uploadInputs,
+    pendingReferenceInputs,
     addImageFiles,
     handleImagePaste,
     handleImageDrop,
@@ -552,6 +628,7 @@ export function initInputSourcesFeature() {
     missingReferenceAssetInputs,
     addReferenceAssetInput,
     collectReferenceOutput,
+    addPreviewReferenceToInput,
     renderReferenceCollector,
     imageFileFromUrl,
     restoreHistoryReferenceHandoff,

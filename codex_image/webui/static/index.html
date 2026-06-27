@@ -77,7 +77,7 @@
         document.documentElement.dataset.locale = locale;
       })();
     </script>
-    <link rel="stylesheet" href="/image-playground/static/styles.css?v=runtime-386" />
+    <link rel="stylesheet" href="/image-playground/static/styles.css?v=runtime-387" />
   </head>
   <body>
     <div class="layout-container">
@@ -228,6 +228,13 @@
               </svg>
               <span id="taskNotificationBadge" class="task-notification-dot hidden" aria-hidden="true"></span>
             </button>
+            <button id="userGuideButton" class="queue-button user-guide-button" type="button" aria-controls="userGuideDrawer" aria-expanded="false" aria-label="操作手册" title="操作手册" data-i18n-attr="aria-label:userGuide.open;title:userGuide.open">
+              <svg class="user-guide-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H7a3 3 0 0 0-3 3V5.5Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/>
+                <path d="M8 7h8M8 11h7M7 19h13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+              </svg>
+              <span data-i18n="userGuide.open">操作手册</span>
+            </button>
             <div id="themeSwitcher" class="theme-switcher" aria-label="主题模式" data-i18n-attr="aria-label:theme.label">
               <button class="theme-option" data-theme-option="system" type="button" aria-pressed="true" data-i18n="theme.system">跟随</button>
               <button class="theme-option" data-theme-option="light" type="button" aria-pressed="false" data-i18n="theme.light">浅色</button>
@@ -262,6 +269,25 @@
             <div id="taskNotificationList" class="task-notification-list"></div>
           </div>
         </header>
+        <div id="userGuideBackdrop" class="user-guide-backdrop hidden" aria-hidden="true"></div>
+        <aside id="userGuideDrawer" class="user-guide-drawer" role="dialog" aria-modal="false" aria-hidden="true" aria-label="操作手册" data-i18n-attr="aria-label:userGuide.title">
+          <div class="user-guide-header">
+            <div>
+              <h2 data-i18n="userGuide.title">操作手册</h2>
+              <p data-i18n="userGuide.subtitle">按你的当前任务查看用法，边看边做。</p>
+            </div>
+            <button id="userGuideClose" class="drawer-close-button" type="button" aria-label="关闭操作手册" title="关闭" data-i18n-attr="aria-label:userGuide.close;title:action.close">
+              <svg class="drawer-close-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M6 6l12 12M18 6L6 18"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="user-guide-search-wrap">
+            <input id="userGuideSearch" class="control user-guide-search" type="search" placeholder="搜索使用问题" autocomplete="off" data-i18n-attr="placeholder:userGuide.search" />
+          </div>
+          <nav id="userGuideNav" class="user-guide-nav" aria-label="操作手册章节" data-i18n-attr="aria-label:userGuide.sections"></nav>
+          <div id="userGuideBody" class="user-guide-body"></div>
+        </aside>
 
         <!-- Dashboard Workspace -->
         <main class="dashboard">
@@ -1199,7 +1225,7 @@
     </div>
 
     <div id="taskNotificationToastRegion" class="task-notification-toast-region" aria-live="polite"></div>
-  <script src="/image-playground/static/app.js?v=runtime-386"></script>
+  <script src="/image-playground/static/app.js?v=runtime-387"></script>
     <script>
       (() => {
         document.querySelectorAll(".radio-group").forEach((group) => {

@@ -99,6 +99,17 @@
   height: 17px;
 }
 
+.user-guide-button {
+  gap: 7px;
+  padding-inline: 13px;
+}
+
+.user-guide-button-icon {
+  display: block;
+  width: 17px;
+  height: 17px;
+}
+
 .task-notification-dot {
   position: absolute;
   top: 8px;
@@ -166,6 +177,152 @@
   max-height: 430px;
   overflow-y: auto;
   padding-right: 2px;
+}
+
+.user-guide-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 8350;
+  background: color-mix(in srgb, var(--code) 12%, transparent);
+}
+
+.user-guide-backdrop.hidden {
+  display: none;
+}
+
+.user-guide-drawer {
+  position: fixed;
+  top: var(--header-height);
+  right: 0;
+  bottom: 0;
+  z-index: 8400;
+  width: min(420px, calc(100vw - 20px));
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 18px;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: -18px 0 44px color-mix(in srgb, var(--code) 14%, transparent);
+  transform: translateX(104%);
+  transition: transform var(--motion-base);
+}
+
+.user-guide-drawer.open {
+  transform: translateX(0);
+}
+
+.user-guide-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.user-guide-header h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.user-guide-header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.user-guide-search-wrap {
+  min-width: 0;
+}
+
+.user-guide-search {
+  width: 100%;
+  height: 38px;
+}
+
+.user-guide-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.user-guide-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.user-guide-tab {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.user-guide-tab.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.user-guide-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.user-guide-section {
+  display: none;
+}
+
+.user-guide-section.active {
+  display: grid;
+  gap: 12px;
+}
+
+.user-guide-section h3 {
+  margin: 0;
+  color: var(--primary-strong);
+  font-size: 15px;
+}
+
+.user-guide-section ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.user-guide-section li {
+  position: relative;
+  padding: 10px 12px 10px 34px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.user-guide-section li::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 17px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--primary);
 }
 
 .task-notification-empty {

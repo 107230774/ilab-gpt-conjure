@@ -23,7 +23,7 @@ function isRunTaskShortcut(event: KeyboardEvent): boolean {
 
 function hasOpenShortcutBlockingLayer(): boolean {
   return Boolean(document.querySelector(
-    "#promptTemplateDrawer.open, #galleryDrawer.open, .modal-overlay:not(.hidden), .prompt-popover:not(.hidden), .confirm-popover:not(.hidden), .compression-popover:not(.hidden), .task-notification-center:not(.hidden)"
+    "#promptTemplateDrawer.open, #galleryDrawer.open, #userGuideDrawer.open, .modal-overlay:not(.hidden), .prompt-popover:not(.hidden), .confirm-popover:not(.hidden), .compression-popover:not(.hidden), .task-notification-center:not(.hidden)"
   ));
 }
 
