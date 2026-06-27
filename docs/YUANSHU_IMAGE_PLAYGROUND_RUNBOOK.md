@@ -526,6 +526,45 @@ Note: because target IP was classified as robot IP traffic by the upstream provi
 
 ## Latest Release Record
 
+2026-06-28 01:24 CST, `image-playground dashboard snapshot and mobile workspace release`:
+
+- Type: yuan-local image playground release; did not rebuild or restart Sub2API, PostgreSQL, Redis, billing, account pool, usage logs, Nginx, or the main Yuanshu app.
+- Scope: dashboard snapshot polling, adaptive Yuanshu refresh intervals, recent-task first-screen limit reduction, lazy thumbnail loading, mobile workspace tabs, mobile history drawer, mobile operation-guide sheet, and local non-Yuanshu task visibility regression fix.
+- Performance fix: Yuanshu embedded mode now uses `GET /api/dashboard/snapshot?limit=80` with `ETag` / `304` instead of polling queue and recent 200 tasks separately. Polling pauses while the page is hidden and avoids overlapping snapshot refreshes.
+- Mobile fix: phone view now uses `参考图 / 提示词 / 参数 / 结果` workspaces; history opens as a drawer; operation guide opens as a full-screen sheet. The prompt footer buttons are constrained to a two-column grid to avoid right-edge clipping on 390px screens.
+- Local-mode fix: unowned local tasks remain visible to authenticated local/non-Yuanshu requests even when the production public-mode default is enabled; Yuanshu-owned tasks remain scoped to the current `user_id`.
+- Cache fix: homepage `styles.css` and `app.js` moved to `runtime-389`; history page `styles.css` moved to `runtime-389`; `history.js` stayed on `history-33`.
+- Source commit deployed: `916fe92 feat: improve yuanshu dashboard performance and mobile layout`.
+- Source package: `/tmp/ilab-gpt-conjure-dashboard-mobile-perf-916fe92.tgz`.
+- Source package SHA256: `e2603d9b9e8a828109066dd0a2953c2f63c752b00748ebf75d13052fdf1dbad2`.
+- New image: `yuanshu-image-playground:0.1.1-ilab-yuanshu-dashboard-mobile-perf-20260628`.
+- New image ID: `sha256:635e2addff0a3db8c3394f460da1df26f301c6f29531c0f53ac97eb41ff1aa74`.
+- Rollback backup: `/opt/yuanshu-image-playground/backups/yuanshu-image-playground-before-dashboard-mobile-perf-20260628-012233.json`.
+- Previous image retained: `yuanshu-image-playground:0.1.1-ilab-yuanshu-reference-feedback-guide-cachebump-20260627`.
+- Local validation: `npm run check:webui`; static task unittest coverage; queue/refactor contract unittest coverage; gallery/settings/generation unittest coverage; Python `py_compile`; Playwright viewport checks at 390, 430, 768, and 1440.
+- Canary validation: yuan `127.0.0.1:18081` `/api/health`, homepage `runtime-389`, history page `runtime-389`/`history-33`, `GET /api/dashboard/snapshot?limit=80` returning 200, unauthenticated `POST /api/gallery` returning 403, and no serious canary logs.
+- Production validation: yuan `127.0.0.1:18080` `/api/health`, homepage `runtime-389`, history page `runtime-389`/`history-33`, `GET /api/dashboard/snapshot?limit=80` returning 200, no canary left, and no recent serious image-playground logs.
+- Public validation: `https://yuans.vip/health`, `/image-playground/api/health`, `/image-playground/`, `/image-playground/history`, `/image-playground/static/app.js?v=runtime-389`, `/image-playground/static/history.js?v=history-33`, and `/image-playground-console` returned OK.
+- Static validation: `/image-playground/static/app.js?v=runtime-389` returned `Content-Length: 2146973` and warmed from `X-Yuanshu-Static-Cache: MISS` to `HIT`; `/image-playground/static/history.js?v=history-33` returned `Content-Length: 1052892`.
+
+Rollback for this release:
+
+```bash
+rtk ssh yuan "set -euo pipefail
+docker rm -f yuanshu-image-playground
+docker run -d --name yuanshu-image-playground \
+  -p 127.0.0.1:18080:8787 \
+  -e ILAB_CONJURE_DATA_DIR=/app/output \
+  -e YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE=true \
+  -e YUANSHU_IMAGE_PLAYGROUND_API_BASE=https://yuans.vip/image-playground/api/v1 \
+  -e YUANSHU_IMAGE_PLAYGROUND_PATH_PREFIX=/image-playground \
+  -v /opt/yuanshu-image-playground/ilab-output:/app/output \
+  yuanshu-image-playground:0.1.1-ilab-yuanshu-reference-feedback-guide-cachebump-20260627
+curl -fsS http://127.0.0.1:18080/api/health | head -c 300
+curl -fsS https://yuans.vip/image-playground/ | grep -E '/image-playground/static/(styles.css|app.js)' | head -2
+"
+```
+
 2026-06-27 21:12 CST, `image-playground reference feedback and guide release`:
 
 - Type: yuan-local image playground release; did not rebuild or restart Sub2API, PostgreSQL, Redis, billing, account pool, usage logs, or the main Yuanshu app. Nginx was reloaded after clearing the image-playground static cache.
