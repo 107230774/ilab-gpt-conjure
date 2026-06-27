@@ -35,8 +35,8 @@ Nginx routing on `yuan`:
 Active yuan image service:
 
 - Container name: `yuanshu-image-playground`
-- Runtime image: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-worker-scope-20260627`
-- Image ID: `sha256:3170f391412b876d2302897d0d93dd341627356d8e3839bf3e28f6b980e4b93d`
+- Runtime image: `yuanshu-image-playground:0.1.1-ilab-yuanshu-reference-feedback-guide-cachebump-20260627`
+- Image ID: `sha256:e5e969cd34a7b94aef713b2235c6498e908e0cc59285237713b5f01ed1fc6ac5`
 - Host port: `127.0.0.1:18080` -> container port `8787`
 - Persistent data: `/opt/yuanshu-image-playground/ilab-output` mounted at `/app/output`
 - Backup root: `/opt/yuanshu-image-playground/backups`
@@ -44,6 +44,8 @@ Active yuan image service:
 Current rollback anchor:
 
 - Old target container is intentionally still running during the 24-hour observation window after the 2026-06-26 migration.
+- Previous yuan image before the reference feedback and guide release: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-worker-scope-20260627`.
+- Inspect backup before the reference feedback and guide cutover: `/opt/yuanshu-image-playground/backups/yuanshu-image-playground-before-reference-feedback-guide-cachebump-20260627-211006.json`.
 - Previous yuan image before the gallery worker-scope fix: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-idempotency-cachebump-20260627`.
 - Inspect backup before the gallery worker-scope cutover: `/opt/yuanshu-image-playground/backups/yuanshu-image-playground-before-gallery-worker-scope-20260627-194624.json`.
 - Previous yuan image before the gallery/idempotency cache-bump release: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-idempotency-20260627`.
@@ -90,6 +92,7 @@ Cache-bump rule:
 
 - If `codex_image/webui/static/app.js`, `history.js`, or `styles.css` changes, bump the matching query string in `codex_image/webui/static/index.html` before packaging.
 - Do this before the deployment build, not as a production hotfix after cutover. Yuan Nginx and browsers cache `/image-playground/static/*`, so unchanged runtime query strings can keep serving the old bundle even when the container has the new files.
+- Do not request the new static query string through the public domain before the new container is live. If that happens, yuan Nginx can cache the old file under the new query string; clear `/var/cache/nginx/yuanshu_image_static` and reload Nginx after cutover.
 - Example: when `app.js` changes, advance `/image-playground/static/app.js?v=runtime-385` to `runtime-386` and verify the public page references the new value after deploy.
 
 Primary validation:
@@ -522,6 +525,45 @@ curl -fsS https://yuans.vip/image-playground/api/health | head -c 300
 Note: because target IP was classified as robot IP traffic by the upstream provider, this rollback may restore page/history service but may not restore successful image generation.
 
 ## Latest Release Record
+
+2026-06-27 21:12 CST, `image-playground reference feedback and guide release`:
+
+- Type: yuan-local image playground release; did not rebuild or restart Sub2API, PostgreSQL, Redis, billing, account pool, usage logs, or the main Yuanshu app. Nginx was reloaded after clearing the image-playground static cache.
+- Scope: preview result "add to reference image" feedback, pending reference placeholders, duplicate add guarding, staged-result feedback, and a user-facing operation guide drawer.
+- UX fix: clicking `加入参考图` now immediately disables the clicked action, shows `加入中...`, inserts a pending thumbnail in the reference area, then resolves to the real reference image or removes it with a retryable error.
+- Guide fix: the top navigation now exposes `操作手册`; the drawer covers quick start, page areas, public library, template library, result actions, and common questions without exposing implementation details.
+- Cache fix: homepage `styles.css` and `app.js` moved to `runtime-387`; history page `styles.css` moved to `runtime-387` and `history.js` moved to `history-33`.
+- Static cache note: `runtime-387` was accidentally requested through the public domain before the yuan production container was cut over, so yuan Nginx cached old static files under the new query string. The static cache directory `/var/cache/nginx/yuanshu_image_static` was cleared and Nginx was reloaded after cutover.
+- Source commits deployed: `0c8329a feat: improve reference add feedback and guide`; `7757ab6 fix: bump history webui asset version`.
+- Source package: `/tmp/ilab-gpt-conjure-reference-feedback-guide-cachebump-7757ab6.tgz`.
+- Source package SHA256: `1430b3f7504de323f1e00b576b019928158ca52964f9d53a0df2d39fa3dbc200`.
+- New image: `yuanshu-image-playground:0.1.1-ilab-yuanshu-reference-feedback-guide-cachebump-20260627`.
+- New image ID: `sha256:e5e969cd34a7b94aef713b2235c6498e908e0cc59285237713b5f01ed1fc6ac5`.
+- Rollback backup: `/opt/yuanshu-image-playground/backups/yuanshu-image-playground-before-reference-feedback-guide-cachebump-20260627-211006.json`.
+- Previous image retained: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-worker-scope-20260627`.
+- Local validation: `npm run check:webui`; targeted static unittest coverage for history static contract, preview output collection, and the user guide drawer.
+- Canary validation: yuan `127.0.0.1:18081` `/api/health`, homepage `runtime-387`, history page `runtime-387`/`history-33`, `app.js?v=runtime-387`, `history.js?v=history-33`, and no serious canary logs.
+- Production validation: yuan `127.0.0.1:18080` `/api/health`, homepage `runtime-387`, history page `runtime-387`/`history-33`, static file sizes matching the container (`app.js` `2138788`, `history.js` `1052892`), no canary left, and no recent serious image-playground logs.
+- Public validation: `https://yuans.vip/health`, `/image-playground/api/health`, `/image-playground/`, `/image-playground/history`, `/image-playground/static/app.js?v=runtime-387`, and `/image-playground/static/history.js?v=history-33` returned OK.
+- Static validation: after clearing the stale Nginx static cache, `/image-playground/static/app.js?v=runtime-387` and `/image-playground/static/history.js?v=history-33` returned the new content lengths and warmed to `X-Yuanshu-Static-Cache: HIT`.
+
+Rollback for this release:
+
+```bash
+rtk ssh yuan "set -euo pipefail
+docker rm -f yuanshu-image-playground
+docker run -d --name yuanshu-image-playground \
+  -p 127.0.0.1:18080:8787 \
+  -e ILAB_CONJURE_DATA_DIR=/app/output \
+  -e YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE=true \
+  -e YUANSHU_IMAGE_PLAYGROUND_API_BASE=https://yuans.vip/image-playground/api/v1 \
+  -e YUANSHU_IMAGE_PLAYGROUND_PATH_PREFIX=/image-playground \
+  -v /opt/yuanshu-image-playground/ilab-output:/app/output \
+  yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-worker-scope-20260627
+curl -fsS http://127.0.0.1:18080/api/health | head -c 300
+curl -fsS https://yuans.vip/image-playground/ | grep -E '/image-playground/static/(styles.css|app.js)' | head -2
+"
+```
 
 2026-06-27 19:47 CST, `image-playground gallery worker-scope fix`:
 
