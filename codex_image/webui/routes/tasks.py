@@ -28,6 +28,7 @@ from codex_image.webui.thumbnails import create_image_thumbnail, thumbnail_needs
 from codex_image.webui.yuanshu_scope import (
     current_yuanshu_owner_for_request,
     filter_current_yuanshu_tasks,
+    local_unowned_tasks_visible,
     metadata_matches_current_yuanshu_owner,
     require_current_yuanshu_task,
 )
@@ -120,7 +121,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
     @app.get("/api/tasks/recent")
     def list_recent_tasks(request: Request, limit: int = Query(200, ge=1, le=500)) -> dict[str, Any]:
         user_id = current_yuanshu_user_id(request)
-        if not user_id:
+        if not user_id and not local_unowned_tasks_visible(ctx, request):
             return {"tasks": []}
         tasks: list[dict[str, Any]] = []
         for card in ctx.storage.list_recent_task_cards(limit=limit, yuanshu_user_id=user_id):
@@ -146,7 +147,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
     @app.get("/api/task-history/summary")
     def task_history_summary(request: Request) -> dict[str, Any]:
         user_id = current_yuanshu_user_id(request)
-        if not user_id:
+        if not user_id and not local_unowned_tasks_visible(ctx, request):
             return empty_history_summary()
         return ctx.storage.task_history_summary(yuanshu_user_id=user_id)
 
@@ -170,7 +171,7 @@ def register_task_routes(app: FastAPI, ctx: WebUIContext) -> None:
         direction: str = Query("next"),
     ) -> dict[str, Any]:
         user_id = current_yuanshu_user_id(request)
-        if not user_id:
+        if not user_id and not local_unowned_tasks_visible(ctx, request):
             return {"tasks": [], "next_cursor": None, "previous_cursor": None}
         result = ctx.storage.query_task_history(
             limit=limit,

@@ -115,6 +115,71 @@ class WebUIQueueTests(unittest.TestCase):
         self.assertIn('"thumbnail_urls": ["/thumb.jpg"]', response.text)
         self.assertNotIn("expanded event prompt", response.text)
         self.assertNotIn('"outputs"', response.text)
+
+    def test_dashboard_snapshot_returns_lightweight_tasks_queue_and_etag(self) -> None:
+        from codex_image.webui.app import create_app
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = create_app(output_root=root, client_factory=lambda: FakeImageClient(), auth_checker=lambda: True, auto_start_queue=False)
+            app.state.yuanshu_sessions["session-a"] = {
+                "token": "token-a",
+                "key_id": 10,
+                "user_id": 1,
+                "session_token_id": "verified-a",
+            }
+            headers = {"X-Yuanshu-Session": "session-a"}
+            completed_task_id = "20260601010101-complete"
+            waiting_task_id = "20260501010101-waiting"
+            owner = {"user_id": 1, "key_id": 10, "session_token_id": "verified-a"}
+            app.state.storage.write_metadata(
+                completed_task_id,
+                {
+                    "task_id": completed_task_id,
+                    "created_at": "2026-06-01T01:01:01+00:00",
+                    "updated_at": "2026-06-01T01:02:01+00:00",
+                    "status": "completed",
+                    "mode": "generate",
+                    "prompt": "latest task",
+                    "prompt_for_model": "expanded prompt should stay out of snapshot",
+                    "params": {"size": "1024x1024", "n": 1},
+                    "outputs": [{"index": 1, "status": "completed", "thumbnail_url": "/thumb-latest.jpg"}],
+                    "generated_count": 1,
+                    "total_count": 1,
+                    "yuanshu_owner": owner,
+                },
+            )
+            app.state.storage.write_metadata(
+                waiting_task_id,
+                {
+                    "task_id": waiting_task_id,
+                    "created_at": "2026-05-01T01:01:01+00:00",
+                    "updated_at": "2026-05-01T01:02:01+00:00",
+                    "status": "queued",
+                    "mode": "generate",
+                    "prompt": "older active task",
+                    "params": {"size": "1024x1024", "n": 1},
+                    "yuanshu_owner": owner,
+                },
+            )
+            app.state.queue_storage.enqueue(waiting_task_id)
+            client = TestClient(app)
+            response = client.get("/api/dashboard/snapshot", params={"limit": 1}, headers=headers)
+            etag = response.headers.get("etag", "")
+            unchanged = client.get("/api/dashboard/snapshot", params={"limit": 1}, headers={**headers, "If-None-Match": etag})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(etag.startswith('"') and etag.endswith('"'))
+        payload = response.json()
+        self.assertIn("revision", payload)
+        self.assertIn("server_time", payload)
+        self.assertEqual(payload["queue"]["summary"]["waiting_count"], 1)
+        self.assertEqual([task["task_id"] for task in payload["tasks"]], [completed_task_id, waiting_task_id])
+        self.assertTrue(payload["tasks"][0]["summary_only"])
+        self.assertNotIn("prompt_for_model", payload["tasks"][0])
+        self.assertEqual(unchanged.status_code, 304)
+        self.assertEqual(unchanged.content, b"")
+
     def test_events_endpoint_restarts_stopped_background_worker(self) -> None:
         from codex_image.webui.app import create_app
 

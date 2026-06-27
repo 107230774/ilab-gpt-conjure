@@ -172,7 +172,7 @@ function galleryGridContentHtml(items: any) {
         <span>${translate("gallery.dragSort")}</span>
       </button>
       <div class="gallery-card-media">
-        <img src="${escapeHtml(yuanshuPath(item.image_url))}" alt="${escapeHtml(item.name)}" draggable="false">
+        <img src="${escapeHtml(yuanshuPath(item.image_url))}" alt="${escapeHtml(item.name)}" draggable="false" loading="lazy" decoding="async">
       </div>
       <div class="gallery-card-body">
         <div class="gallery-card-heading">

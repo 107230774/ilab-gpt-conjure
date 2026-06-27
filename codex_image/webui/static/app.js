@@ -162,6 +162,10 @@
       apiDirectSettingsButton: document.querySelector("#apiDirectSettingsButton"),
       queueButton: document.querySelector("#queueButton"),
       queueStatusText: document.querySelector("#queueStatusText"),
+      mobileHistoryButton: document.querySelector("#mobileHistoryButton"),
+      mobileHistoryCloseButton: document.querySelector("#mobileHistoryCloseButton"),
+      mobileHistoryBackdrop: document.querySelector("#mobileHistoryBackdrop"),
+      mobileWorkspaceTabs: document.querySelector("#mobileWorkspaceTabs"),
       taskNotificationButton: document.querySelector("#taskNotificationButton"),
       taskNotificationBadge: document.querySelector("#taskNotificationBadge"),
       taskNotificationCenter: document.querySelector("#taskNotificationCenter"),
@@ -27635,7 +27639,7 @@ ${hint}` : hint;
       return `
     <div class="recent-asset-button" title="${escapeHtml4(name)}">
       <button class="recent-asset-use" type="button" data-reference-asset-id="${escapeHtml4(item.id)}" aria-label="${escapeHtml4(formatTranslation("recentAssets.use", { name }))}">
-        <img src="${escapeHtml4(yuanshuPath(item.image_url))}" alt="${escapeHtml4(name)}">
+        <img src="${escapeHtml4(yuanshuPath(item.image_url))}" alt="${escapeHtml4(name)}" loading="lazy" decoding="async">
         <span>${escapeHtml4(name)}</span>
       </button>
       <button class="recent-asset-delete" type="button" data-reference-asset-delete="${escapeHtml4(item.id)}" aria-label="${escapeHtml4(formatTranslation("recentAssets.delete", { name }))}">\xD7</button>
@@ -28133,7 +28137,7 @@ ${hint}` : hint;
         <span>${translate("gallery.dragSort")}</span>
       </button>
       <div class="gallery-card-media">
-        <img src="${escapeHtml6(yuanshuPath(item.image_url))}" alt="${escapeHtml6(item.name)}" draggable="false">
+        <img src="${escapeHtml6(yuanshuPath(item.image_url))}" alt="${escapeHtml6(item.name)}" draggable="false" loading="lazy" decoding="async">
       </div>
       <div class="gallery-card-body">
         <div class="gallery-card-heading">
@@ -33995,7 +33999,7 @@ ${galleryText}`;
   function currentQuantity() {
     const value = Number.parseInt(els23.nInput?.value || "1", 10);
     if (Number.isNaN(value)) return 1;
-    return Math.min(2, Math.max(1, value));
+    return Math.min(4, Math.max(1, value));
   }
   function updateQuantity() {
     if (!els23.nInput) return;
@@ -37325,6 +37329,7 @@ ${galleryText}`;
     if (params.model) els33.model.value = params.model;
     if (params.size) syncSizeControlsFromSize2(params.size);
     if (params.n && els33.nInput) {
+      ensureQuantityOption(String(params.n));
       els33.nInput.value = String(params.n);
     }
     if (params.quality) els33.quality.value = params.quality;
@@ -37342,6 +37347,15 @@ ${galleryText}`;
     updateCompression2();
     updateCustomSize2();
     updateRequestPreview11();
+  }
+  function ensureQuantityOption(value) {
+    const select = els33.nInput;
+    if (!select || typeof select.querySelector !== "function") return;
+    if (select.querySelector(`option[value="${CSS.escape(value)}"]`)) return;
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    select.appendChild(option);
   }
   function buildPreviewRequest2() {
     const params = currentTaskParams2();
@@ -37476,8 +37490,11 @@ ${galleryText}`;
   function scheduleYuanshuSubmitSettleRefresh() {
     YUANSHU_SUBMIT_SETTLE_REFRESH_DELAYS_MS.forEach((delay) => {
       window.setTimeout(() => {
-        void window.refreshQueue?.();
-        void getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+        if (window.refreshDashboardSnapshot) {
+          void window.refreshDashboardSnapshot({ force: true });
+        } else {
+          void window.refreshQueue?.();
+        }
       }, delay);
     });
   }
@@ -37602,14 +37619,23 @@ ${galleryText}`;
       if (yuanshuMode) {
         window.startRealtimeUpdates?.({ migrateLegacyArchives: false });
         scheduleYuanshuSubmitSettleRefresh();
+        getLegacyBridge().methods.setMobileWorkspaceTab?.("preview");
       }
       if (els33.requestJson) {
         els33.requestJson.textContent = JSON.stringify(data.request || {}, null, 2);
       }
       stopRunFeedback2();
       setStatus17(data.duplicate ? "\u76F8\u540C\u53C2\u6570\u7684\u4EFB\u52A1\u5DF2\u7ECF\u5728\u63D0\u4EA4\u6216\u751F\u6210\u4E2D\uFF0C\u5DF2\u8FD4\u56DE\u5DF2\u6709\u4EFB\u52A1\u3002" : translate("taskSubmit.queued"), "ok");
-      await window.refreshQueue?.();
-      await getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+      if (yuanshuMode) {
+        if (window.refreshDashboardSnapshot) {
+          await window.refreshDashboardSnapshot({ force: true });
+        } else {
+          await window.refreshQueue?.();
+        }
+      } else {
+        await window.refreshQueue?.();
+        await getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+      }
       await refreshRecentAssets2();
       renderPreview4(data.task);
     } catch (error) {
@@ -37782,15 +37808,21 @@ ${galleryText}`;
   // codex_image/webui/frontend/src/queue.ts
   var REALTIME_EVENTS_URL = "/api/events?stream=1";
   var QUEUE_DISPATCH_RESYNC_DELAY_MS = 1500;
-  var YUANSHU_QUEUE_POLL_INTERVAL_MS = 5e3;
+  var YUANSHU_DASHBOARD_SNAPSHOT_LIMIT = 80;
+  var YUANSHU_ACTIVE_POLL_INTERVAL_MS = 5e3;
+  var YUANSHU_IDLE_POLL_INTERVAL_MS = 2e4;
   var YUANSHU_COMPLETION_REFRESH_DELAYS_MS = [0, 500, 1500, 3e3];
   var TERMINAL_TASK_STATUSES = /* @__PURE__ */ new Set(["completed", "failed", "partial_failed"]);
   var YUANSHU_TASK_DETAIL_REFRESH_DELAYS_MS = [0, 700, 1800, 3500];
   var ACTIVE_TASK_STATUSES = /* @__PURE__ */ new Set(["submitting", "queued", "running"]);
   var queueFeatureInitialized = false;
   var yuanshuQueuePollTimerId = null;
+  var yuanshuQueuePollingActive = false;
+  var yuanshuDashboardSnapshotEtag = "";
+  var yuanshuDashboardSnapshotInFlight = null;
   var yuanshuCompletionRefreshTimerIds = [];
   var yuanshuTaskDetailRefreshTimerIds = [];
+  var yuanshuVisibilityListenerInstalled = false;
   function yuanshuSessionHeaders() {
     const headers = new Headers();
     const yuanshuSessionId2 = getYuanshuSessionId();
@@ -37815,6 +37847,7 @@ ${galleryText}`;
     window.startRealtimeUpdates = startRealtimeUpdates;
     window.closeRealtimeUpdates = closeRealtimeUpdates;
     window.refreshQueue = refreshQueue;
+    window.refreshDashboardSnapshot = refreshDashboardSnapshot;
     window.applyQueueState = applyQueueState;
     window.applyQueueTasks = applyQueueTasks;
     window.updateQueueElapsedDisplays = updateQueueElapsedDisplays;
@@ -37863,31 +37896,113 @@ ${galleryText}`;
     return window.location.pathname.startsWith("/image-playground");
   }
   function startYuanshuQueuePolling({ migrateLegacyArchives = false } = {}) {
-    const pollOnce = (shouldMigrateArchives2 = false) => {
-      void refreshQueue();
-      void getLegacyBridge().methods.refreshTasks?.({
-        migrateLegacyArchives: shouldMigrateArchives2,
-        preserveExistingOnEmpty: true
-      });
-    };
-    if (yuanshuQueuePollTimerId !== null) {
-      pollOnce(migrateLegacyArchives);
+    if (yuanshuQueuePollingActive) {
+      void refreshDashboardSnapshot({ migrateLegacyArchives, force: true });
       return;
     }
-    let shouldMigrateArchives = migrateLegacyArchives;
+    yuanshuQueuePollingActive = true;
+    let shouldMigrateArchives = Boolean(migrateLegacyArchives);
     const poll = () => {
-      pollOnce(shouldMigrateArchives);
+      yuanshuQueuePollTimerId = null;
+      if (!yuanshuQueuePollingActive || document.hidden) return;
+      void refreshDashboardSnapshot({ migrateLegacyArchives: shouldMigrateArchives }).finally(scheduleYuanshuNextPoll);
       shouldMigrateArchives = false;
     };
-    yuanshuQueuePollTimerId = window.setInterval(poll, YUANSHU_QUEUE_POLL_INTERVAL_MS);
+    if (!yuanshuVisibilityListenerInstalled) {
+      yuanshuVisibilityListenerInstalled = true;
+      document.addEventListener("visibilitychange", handleYuanshuVisibilityChange);
+    }
     window.addEventListener("pagehide", stopYuanshuQueuePolling, { once: true });
-    document.addEventListener("visibilitychange", poll);
     poll();
   }
   function stopYuanshuQueuePolling() {
-    if (yuanshuQueuePollTimerId === null) return;
-    window.clearInterval(yuanshuQueuePollTimerId);
-    yuanshuQueuePollTimerId = null;
+    yuanshuQueuePollingActive = false;
+    if (yuanshuQueuePollTimerId !== null) {
+      window.clearTimeout(yuanshuQueuePollTimerId);
+      yuanshuQueuePollTimerId = null;
+    }
+  }
+  function handleYuanshuVisibilityChange() {
+    if (!yuanshuQueuePollingActive) return;
+    if (document.hidden) {
+      if (yuanshuQueuePollTimerId !== null) {
+        window.clearTimeout(yuanshuQueuePollTimerId);
+        yuanshuQueuePollTimerId = null;
+      }
+      return;
+    }
+    void refreshDashboardSnapshot({ force: true }).finally(scheduleYuanshuNextPoll);
+  }
+  function scheduleYuanshuNextPoll() {
+    if (!yuanshuQueuePollingActive || document.hidden || yuanshuQueuePollTimerId !== null) return;
+    const delay = hasActiveQueueOrTask() ? YUANSHU_ACTIVE_POLL_INTERVAL_MS : YUANSHU_IDLE_POLL_INTERVAL_MS;
+    yuanshuQueuePollTimerId = window.setTimeout(() => {
+      yuanshuQueuePollTimerId = null;
+      void refreshDashboardSnapshot().finally(scheduleYuanshuNextPoll);
+    }, delay);
+  }
+  function hasActiveQueueOrTask() {
+    const state32 = getState();
+    const waiting = Array.isArray(state32.queue?.waiting) ? state32.queue.waiting : [];
+    const running = Array.isArray(state32.queue?.running) ? state32.queue.running : [];
+    if (waiting.length || running.length) return true;
+    return (state32.tasks || []).some((task) => ACTIVE_TASK_STATUSES.has(String(task?.status || "")));
+  }
+  async function refreshDashboardSnapshot({
+    migrateLegacyArchives = false,
+    force = false
+  } = {}) {
+    if (!isYuanshuEmbeddedMode()) {
+      await refreshQueue();
+      await getLegacyBridge().methods.refreshTasks?.({ migrateLegacyArchives, preserveExistingOnEmpty: true });
+      return;
+    }
+    if (document.hidden && !force) return;
+    if (yuanshuDashboardSnapshotInFlight) return yuanshuDashboardSnapshotInFlight;
+    yuanshuDashboardSnapshotInFlight = fetchDashboardSnapshot({ migrateLegacyArchives }).finally(() => {
+      yuanshuDashboardSnapshotInFlight = null;
+    });
+    return yuanshuDashboardSnapshotInFlight;
+  }
+  async function fetchDashboardSnapshot({ migrateLegacyArchives = false } = {}) {
+    const bridge39 = getLegacyBridge();
+    const state32 = bridge39.state;
+    const headers = yuanshuSessionHeaders();
+    if (yuanshuDashboardSnapshotEtag) {
+      headers.set("If-None-Match", yuanshuDashboardSnapshotEtag);
+    }
+    try {
+      const response = await fetch(noStoreUrl(`/api/dashboard/snapshot?limit=${YUANSHU_DASHBOARD_SNAPSHOT_LIMIT}`), {
+        cache: "no-store",
+        headers
+      });
+      if (response.status === 304) {
+        updateQueueElapsedDisplays();
+        return;
+      }
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || translate("queue.readFailed"));
+      }
+      const revision = String(data.revision || "");
+      const etag = response.headers.get("ETag") || (revision ? `"${revision}"` : "");
+      if (etag) yuanshuDashboardSnapshotEtag = etag;
+      if (revision && state32.dashboardSnapshotRevision === revision) {
+        updateQueueElapsedDisplays();
+        return;
+      }
+      state32.dashboardSnapshotRevision = revision;
+      applyQueueState(data.queue);
+      await bridge39.methods.applyTasksSnapshot?.(Array.isArray(data.tasks) ? data.tasks : [], {
+        migrateLegacyArchives,
+        preserveExistingOnEmpty: true,
+        requestSeq: ++state32.tasksRequestSeq
+      });
+      applyQueueTasks(data.queue);
+      state32.realtimeSnapshotNeedsArchiveMigration = false;
+    } catch (error) {
+      bridge39.methods.setStatus(errorMessage5(error, translate("queue.readFailed")), "error");
+    }
   }
   function scheduleYuanshuCompletionRefreshBurst() {
     if (!isYuanshuEmbeddedMode()) {
@@ -37896,7 +38011,7 @@ ${galleryText}`;
     }
     yuanshuCompletionRefreshTimerIds.forEach((timerId) => window.clearTimeout(timerId));
     yuanshuCompletionRefreshTimerIds = YUANSHU_COMPLETION_REFRESH_DELAYS_MS.map((delay) => window.setTimeout(() => {
-      void getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+      void refreshDashboardSnapshot({ force: true });
     }, delay));
   }
   async function refreshCompletedQueueSnapshot() {
@@ -37934,7 +38049,7 @@ ${galleryText}`;
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data?.task) return;
       bridge39.methods.applyTaskUpdate?.(data.task);
-      await bridge39.methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+      await refreshDashboardSnapshot({ force: true });
     } catch (error) {
       console.warn(error);
     }
@@ -37974,6 +38089,10 @@ ${galleryText}`;
     }
   }
   async function refreshQueue() {
+    if (isYuanshuEmbeddedMode()) {
+      await refreshDashboardSnapshot({ force: true });
+      return;
+    }
     const bridge39 = getLegacyBridge();
     const state32 = bridge39.state;
     const requestSeq = ++state32.queueRequestSeq;
@@ -40862,6 +40981,7 @@ ${galleryText}`;
   var taskHasViewableUpdate2 = (...args) => legacyMethod39("taskHasViewableUpdate", ...args);
   var markTaskViewed2 = (...args) => legacyMethod39("markTaskViewed", ...args);
   var ensureSelectedTaskDetail = (...args) => legacyMethod39("ensureSelectedTaskDetail", ...args);
+  var RECENT_TASK_SIDEBAR_LIMIT = 80;
   var TASK_SEARCH_HISTORY_LIMIT = 100;
   var TASK_SEARCH_HISTORY_DEBOUNCE_MS = 180;
   var RECENTLY_FINISHED_PRESERVE_MS = 5 * 60 * 1e3;
@@ -40886,7 +41006,7 @@ ${galleryText}`;
       headers.set("X-Yuanshu-Session", yuanshuSessionId2);
       headers.set("Cache-Control", "no-cache");
     }
-    const response = await fetch(noStoreUrl2("/api/tasks/recent?limit=200"), {
+    const response = await fetch(noStoreUrl2(`/api/tasks/recent?limit=${RECENT_TASK_SIDEBAR_LIMIT}`), {
       cache: "no-store",
       headers
     });
@@ -40918,10 +41038,11 @@ ${galleryText}`;
     if (!preserved.length) return nextTasks;
     return [...preserved, ...nextTasks];
   }
-  async function applyTasksSnapshot(tasks, { migrateLegacyArchives = false, requestSeq = state29.tasksRequestSeq } = {}) {
+  async function applyTasksSnapshot(tasks, { migrateLegacyArchives = false, requestSeq = state29.tasksRequestSeq, preserveExistingOnEmpty = false } = {}) {
+    const nextSnapshotTasks = preserveExistingOnEmpty ? mergePreservedVisibleTasks(Array.isArray(tasks) ? tasks : []) : tasks;
     const previousLocalPendingTasks = state29.tasks.filter((task) => task?.local_pending);
     const pendingTask = state29.pendingTaskId ? state29.tasks.find((task) => task.task_id === state29.pendingTaskId) : null;
-    state29.tasks = Array.isArray(tasks) ? tasks : [];
+    state29.tasks = Array.isArray(nextSnapshotTasks) ? nextSnapshotTasks : [];
     if (pendingTask?.local_pending && !state29.tasks.some((task) => task.task_id === pendingTask.task_id)) {
       state29.tasks.unshift(pendingTask);
     }
@@ -42657,6 +42778,70 @@ ${galleryText}`;
     startBootstrapReadyRetry();
   }
 
+  // codex_image/webui/frontend/src/mobile-workspace.ts
+  var MOBILE_WORKSPACE_TABS = /* @__PURE__ */ new Set(["reference", "prompt", "settings", "preview"]);
+  var mobileWorkspaceInitialized = false;
+  function normalizeTab(tab) {
+    const value = String(tab || "").trim();
+    return MOBILE_WORKSPACE_TABS.has(value) ? value : "reference";
+  }
+  function setMobileWorkspaceTab(tab) {
+    const nextTab = normalizeTab(tab);
+    document.documentElement.dataset.mobileWorkspace = nextTab;
+    document.querySelectorAll("[data-mobile-workspace-tab]").forEach((button) => {
+      const active = button.dataset.mobileWorkspaceTab === nextTab;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    if (nextTab === "preview") {
+      closeMobileHistoryDrawer();
+    }
+  }
+  function openMobileHistoryDrawer() {
+    document.documentElement.dataset.mobileHistoryOpen = "true";
+    const els43 = getEls();
+    els43.mobileHistoryBackdrop?.classList.remove("hidden");
+    els43.mobileHistoryButton?.setAttribute("aria-expanded", "true");
+  }
+  function closeMobileHistoryDrawer() {
+    delete document.documentElement.dataset.mobileHistoryOpen;
+    const els43 = getEls();
+    els43.mobileHistoryBackdrop?.classList.add("hidden");
+    els43.mobileHistoryButton?.setAttribute("aria-expanded", "false");
+  }
+  function bindMobileWorkspaceEvents() {
+    const els43 = getEls();
+    els43.mobileWorkspaceTabs?.addEventListener("click", (event) => {
+      const button = event.target?.closest?.("[data-mobile-workspace-tab]");
+      if (!button) return;
+      setMobileWorkspaceTab(button.dataset.mobileWorkspaceTab);
+    });
+    els43.mobileHistoryButton?.addEventListener("click", openMobileHistoryDrawer);
+    els43.mobileHistoryCloseButton?.addEventListener("click", closeMobileHistoryDrawer);
+    els43.mobileHistoryBackdrop?.addEventListener("click", closeMobileHistoryDrawer);
+    els43.queueButton?.addEventListener("click", () => {
+      const state32 = getLegacyBridge().state;
+      if ((state32.queue?.waiting || []).length || (state32.queue?.running || []).length) {
+        setMobileWorkspaceTab("preview");
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || document.documentElement.dataset.mobileHistoryOpen !== "true") return;
+      closeMobileHistoryDrawer();
+    });
+  }
+  function initMobileWorkspaceFeature() {
+    if (mobileWorkspaceInitialized) return;
+    mobileWorkspaceInitialized = true;
+    setMobileWorkspaceTab(document.documentElement.dataset.mobileWorkspace || "reference");
+    bindMobileWorkspaceEvents();
+    Object.assign(getLegacyBridge().methods, {
+      setMobileWorkspaceTab,
+      openMobileHistoryDrawer,
+      closeMobileHistoryDrawer
+    });
+  }
+
   // codex_image/webui/frontend/src/main.ts
   cleanupLegacyYuanshuServiceWorker();
   installYuanshuPathRuntime();
@@ -42700,6 +42885,7 @@ ${galleryText}`;
   initLightboxFeature();
   initializeQueueFeature();
   initSegmentedIndicatorFeature();
+  initMobileWorkspaceFeature();
   window.__codexImageWebUI?.boot();
   initUserGuideFeature();
   initYuanshuModeFeature();

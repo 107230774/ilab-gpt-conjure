@@ -37,6 +37,7 @@ declare global {
     startRealtimeUpdates?: (options?: { migrateLegacyArchives?: boolean }) => boolean;
     closeRealtimeUpdates?: () => void;
     refreshQueue?: () => Promise<void>;
+    refreshDashboardSnapshot?: (options?: { migrateLegacyArchives?: boolean; force?: boolean }) => Promise<void>;
     applyQueueState?: (queue: QueueState | null | undefined) => void;
     applyQueueTasks?: (queue: QueueState | null | undefined) => void;
     updateQueueElapsedDisplays?: () => void;

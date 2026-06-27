@@ -24,6 +24,7 @@ const revokeTaskUploadPreviewUrls = (...args: any[]) => legacyMethod("revokeTask
 const taskHasViewableUpdate = (...args: any[]) => legacyMethod("taskHasViewableUpdate", ...args);
 const markTaskViewed = (...args: any[]) => legacyMethod("markTaskViewed", ...args);
 const ensureSelectedTaskDetail = (...args: any[]) => legacyMethod("ensureSelectedTaskDetail", ...args);
+const RECENT_TASK_SIDEBAR_LIMIT = 80;
 const TASK_SEARCH_HISTORY_LIMIT = 100;
 const TASK_SEARCH_HISTORY_DEBOUNCE_MS = 180;
 const RECENTLY_FINISHED_PRESERVE_MS = 5 * 60 * 1000;
@@ -53,7 +54,7 @@ async function refreshTasks({ migrateLegacyArchives = false, preserveExistingOnE
     headers.set("X-Yuanshu-Session", yuanshuSessionId);
     headers.set("Cache-Control", "no-cache");
   }
-  const response = await fetch(noStoreUrl("/api/tasks/recent?limit=200"), {
+  const response = await fetch(noStoreUrl(`/api/tasks/recent?limit=${RECENT_TASK_SIDEBAR_LIMIT}`), {
     cache: "no-store",
     headers,
   });
@@ -87,10 +88,14 @@ function mergePreservedVisibleTasks(tasks: any[]) {
   return [...preserved, ...nextTasks];
 }
 
-async function applyTasksSnapshot(tasks: any, { migrateLegacyArchives = false, requestSeq = state.tasksRequestSeq }: any = {}) {
+async function applyTasksSnapshot(
+  tasks: any,
+  { migrateLegacyArchives = false, requestSeq = state.tasksRequestSeq, preserveExistingOnEmpty = false }: any = {},
+) {
+  const nextSnapshotTasks = preserveExistingOnEmpty ? mergePreservedVisibleTasks(Array.isArray(tasks) ? tasks : []) : tasks;
   const previousLocalPendingTasks = state.tasks.filter((task: any) => task?.local_pending);
   const pendingTask = state.pendingTaskId ? state.tasks.find((task: any) => task.task_id === state.pendingTaskId) : null;
-  state.tasks = Array.isArray(tasks) ? tasks : [];
+  state.tasks = Array.isArray(nextSnapshotTasks) ? nextSnapshotTasks : [];
   if (pendingTask?.local_pending && !state.tasks.some((task: any) => task.task_id === pendingTask.task_id)) {
     state.tasks.unshift(pendingTask);
   }

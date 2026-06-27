@@ -43,6 +43,7 @@ import { initSegmentedIndicatorFeature } from "./segmented-indicator";
 import { initI18nFeature } from "./i18n";
 import { initUserGuideFeature } from "./user-guide";
 import { initYuanshuModeFeature } from "./yuanshu";
+import { initMobileWorkspaceFeature } from "./mobile-workspace";
 
 cleanupLegacyYuanshuServiceWorker();
 installYuanshuPathRuntime();
@@ -86,6 +87,7 @@ initAppVersionFeature();
 initLightboxFeature();
 initializeQueueFeature();
 initSegmentedIndicatorFeature();
+initMobileWorkspaceFeature();
 window.__codexImageWebUI?.boot();
 initUserGuideFeature();
 initYuanshuModeFeature();

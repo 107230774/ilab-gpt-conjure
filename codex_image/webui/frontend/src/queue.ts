@@ -6,7 +6,9 @@ import { getYuanshuSessionId, yuanshuPath } from "./yuanshu-paths";
 
 const REALTIME_EVENTS_URL = "/api/events?stream=1";
 const QUEUE_DISPATCH_RESYNC_DELAY_MS = 1500;
-const YUANSHU_QUEUE_POLL_INTERVAL_MS = 5000;
+const YUANSHU_DASHBOARD_SNAPSHOT_LIMIT = 80;
+const YUANSHU_ACTIVE_POLL_INTERVAL_MS = 5000;
+const YUANSHU_IDLE_POLL_INTERVAL_MS = 20000;
 const YUANSHU_COMPLETION_REFRESH_DELAYS_MS = [0, 500, 1500, 3000];
 const TERMINAL_TASK_STATUSES = new Set(["completed", "failed", "partial_failed"]);
 const YUANSHU_TASK_DETAIL_REFRESH_DELAYS_MS = [0, 700, 1800, 3500];
@@ -25,8 +27,12 @@ type QueueTask = WebUITask & {
 
 let queueFeatureInitialized = false;
 let yuanshuQueuePollTimerId: number | null = null;
+let yuanshuQueuePollingActive = false;
+let yuanshuDashboardSnapshotEtag = "";
+let yuanshuDashboardSnapshotInFlight: Promise<void> | null = null;
 let yuanshuCompletionRefreshTimerIds: number[] = [];
 let yuanshuTaskDetailRefreshTimerIds: number[] = [];
+let yuanshuVisibilityListenerInstalled = false;
 
 function yuanshuSessionHeaders(): Headers {
   const headers = new Headers();
@@ -55,6 +61,7 @@ function exposeQueueWindowApi(): void {
   window.startRealtimeUpdates = startRealtimeUpdates;
   window.closeRealtimeUpdates = closeRealtimeUpdates;
   window.refreshQueue = refreshQueue;
+  window.refreshDashboardSnapshot = refreshDashboardSnapshot;
   window.applyQueueState = applyQueueState;
   window.applyQueueTasks = applyQueueTasks;
   window.updateQueueElapsedDisplays = updateQueueElapsedDisplays;
@@ -108,32 +115,123 @@ function isYuanshuEmbeddedMode(): boolean {
 }
 
 function startYuanshuQueuePolling({ migrateLegacyArchives = false } = {}): void {
-  const pollOnce = (shouldMigrateArchives = false) => {
-    void refreshQueue();
-    void getLegacyBridge().methods.refreshTasks?.({
-      migrateLegacyArchives: shouldMigrateArchives,
-      preserveExistingOnEmpty: true,
-    });
-  };
-  if (yuanshuQueuePollTimerId !== null) {
-    pollOnce(migrateLegacyArchives);
+  if (yuanshuQueuePollingActive) {
+    void refreshDashboardSnapshot({ migrateLegacyArchives, force: true });
     return;
   }
-  let shouldMigrateArchives = migrateLegacyArchives;
+  yuanshuQueuePollingActive = true;
+  let shouldMigrateArchives = Boolean(migrateLegacyArchives);
   const poll = () => {
-    pollOnce(shouldMigrateArchives);
+    yuanshuQueuePollTimerId = null;
+    if (!yuanshuQueuePollingActive || document.hidden) return;
+    void refreshDashboardSnapshot({ migrateLegacyArchives: shouldMigrateArchives }).finally(scheduleYuanshuNextPoll);
     shouldMigrateArchives = false;
   };
-  yuanshuQueuePollTimerId = window.setInterval(poll, YUANSHU_QUEUE_POLL_INTERVAL_MS);
+  if (!yuanshuVisibilityListenerInstalled) {
+    yuanshuVisibilityListenerInstalled = true;
+    document.addEventListener("visibilitychange", handleYuanshuVisibilityChange);
+  }
   window.addEventListener("pagehide", stopYuanshuQueuePolling, { once: true });
-  document.addEventListener("visibilitychange", poll);
   poll();
 }
 
 function stopYuanshuQueuePolling(): void {
-  if (yuanshuQueuePollTimerId === null) return;
-  window.clearInterval(yuanshuQueuePollTimerId);
-  yuanshuQueuePollTimerId = null;
+  yuanshuQueuePollingActive = false;
+  if (yuanshuQueuePollTimerId !== null) {
+    window.clearTimeout(yuanshuQueuePollTimerId);
+    yuanshuQueuePollTimerId = null;
+  }
+}
+
+function handleYuanshuVisibilityChange(): void {
+  if (!yuanshuQueuePollingActive) return;
+  if (document.hidden) {
+    if (yuanshuQueuePollTimerId !== null) {
+      window.clearTimeout(yuanshuQueuePollTimerId);
+      yuanshuQueuePollTimerId = null;
+    }
+    return;
+  }
+  void refreshDashboardSnapshot({ force: true }).finally(scheduleYuanshuNextPoll);
+}
+
+function scheduleYuanshuNextPoll(): void {
+  if (!yuanshuQueuePollingActive || document.hidden || yuanshuQueuePollTimerId !== null) return;
+  const delay = hasActiveQueueOrTask() ? YUANSHU_ACTIVE_POLL_INTERVAL_MS : YUANSHU_IDLE_POLL_INTERVAL_MS;
+  yuanshuQueuePollTimerId = window.setTimeout(() => {
+    yuanshuQueuePollTimerId = null;
+    void refreshDashboardSnapshot().finally(scheduleYuanshuNextPoll);
+  }, delay);
+}
+
+function hasActiveQueueOrTask(): boolean {
+  const state = getState();
+  const waiting = Array.isArray(state.queue?.waiting) ? state.queue.waiting : [];
+  const running = Array.isArray(state.queue?.running) ? state.queue.running : [];
+  if (waiting.length || running.length) return true;
+  return (state.tasks || []).some((task) => ACTIVE_TASK_STATUSES.has(String(task?.status || "")));
+}
+
+export async function refreshDashboardSnapshot({
+  migrateLegacyArchives = false,
+  force = false,
+}: {
+  migrateLegacyArchives?: boolean;
+  force?: boolean;
+} = {}): Promise<void> {
+  if (!isYuanshuEmbeddedMode()) {
+    await refreshQueue();
+    await getLegacyBridge().methods.refreshTasks?.({ migrateLegacyArchives, preserveExistingOnEmpty: true });
+    return;
+  }
+  if (document.hidden && !force) return;
+  if (yuanshuDashboardSnapshotInFlight) return yuanshuDashboardSnapshotInFlight;
+  yuanshuDashboardSnapshotInFlight = fetchDashboardSnapshot({ migrateLegacyArchives })
+    .finally(() => {
+      yuanshuDashboardSnapshotInFlight = null;
+    });
+  return yuanshuDashboardSnapshotInFlight;
+}
+
+async function fetchDashboardSnapshot({ migrateLegacyArchives = false } = {}): Promise<void> {
+  const bridge = getLegacyBridge();
+  const state = bridge.state;
+  const headers = yuanshuSessionHeaders();
+  if (yuanshuDashboardSnapshotEtag) {
+    headers.set("If-None-Match", yuanshuDashboardSnapshotEtag);
+  }
+  try {
+    const response = await fetch(noStoreUrl(`/api/dashboard/snapshot?limit=${YUANSHU_DASHBOARD_SNAPSHOT_LIMIT}`), {
+      cache: "no-store",
+      headers,
+    });
+    if (response.status === 304) {
+      updateQueueElapsedDisplays();
+      return;
+    }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.detail || translate("queue.readFailed"));
+    }
+    const revision = String(data.revision || "");
+    const etag = response.headers.get("ETag") || (revision ? `"${revision}"` : "");
+    if (etag) yuanshuDashboardSnapshotEtag = etag;
+    if (revision && state.dashboardSnapshotRevision === revision) {
+      updateQueueElapsedDisplays();
+      return;
+    }
+    state.dashboardSnapshotRevision = revision;
+    applyQueueState(data.queue);
+    await bridge.methods.applyTasksSnapshot?.(Array.isArray(data.tasks) ? data.tasks : [], {
+      migrateLegacyArchives,
+      preserveExistingOnEmpty: true,
+      requestSeq: ++state.tasksRequestSeq,
+    });
+    applyQueueTasks(data.queue);
+    state.realtimeSnapshotNeedsArchiveMigration = false;
+  } catch (error: unknown) {
+    bridge.methods.setStatus(errorMessage(error, translate("queue.readFailed")), "error");
+  }
 }
 
 function scheduleYuanshuCompletionRefreshBurst(): void {
@@ -143,7 +241,7 @@ function scheduleYuanshuCompletionRefreshBurst(): void {
   }
   yuanshuCompletionRefreshTimerIds.forEach((timerId) => window.clearTimeout(timerId));
   yuanshuCompletionRefreshTimerIds = YUANSHU_COMPLETION_REFRESH_DELAYS_MS.map((delay) => window.setTimeout(() => {
-    void getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+    void refreshDashboardSnapshot({ force: true });
   }, delay));
 }
 
@@ -184,7 +282,7 @@ async function refreshTaskDetailIntoSidebar(taskId: string): Promise<void> {
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.task) return;
     bridge.methods.applyTaskUpdate?.(data.task);
-    await bridge.methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+    await refreshDashboardSnapshot({ force: true });
   } catch (error) {
     console.warn(error);
   }
@@ -227,6 +325,10 @@ export async function handleRealtimePayload(payload: RealtimePayload | null | un
 }
 
 export async function refreshQueue(): Promise<void> {
+  if (isYuanshuEmbeddedMode()) {
+    await refreshDashboardSnapshot({ force: true });
+    return;
+  }
   const bridge = getLegacyBridge();
   const state = bridge.state;
   const requestSeq = ++state.queueRequestSeq;

@@ -17,20 +17,48 @@ class WebUIStaticTaskTests(WebUIStaticTestCase):
         i18n_source = self._i18n_dictionary_source()
         sidebar_styles = Path("codex_image/webui/static/styles/10-sidebar.css").read_text(encoding="utf-8")
 
-        self.assertIn('fetch("/api/tasks/recent?limit=200")', tasks_source)
+        self.assertIn("const RECENT_TASK_SIDEBAR_LIMIT = 80", tasks_source)
+        self.assertIn("/api/tasks/recent?limit=${RECENT_TASK_SIDEBAR_LIMIT}", tasks_source)
         self.assertNotIn('fetch("/api/tasks")', tasks_source)
         self.assertNotIn('["older", translate("taskGroup.older")]', render_source)
         self.assertIn("historyLibraryGroup", render_source)
         self.assertIn("renderHistoryLibraryGroup(tasks, query)", render_source)
         self.assertIn("taskHistoryLibrarySlot", render_source)
         self.assertNotIn("olderCount", render_source)
-        self.assertIn('href="/history"', render_source)
+        self.assertIn('href="${yuanshuPath("/history")}"', render_source)
         self.assertNotIn('id="archiveButton"', html)
         self.assertNotIn('data-i18n="footer.historyLibrary"', html)
         self.assertIn('id="taskHistoryLibrarySlot"', html)
         self.assertIn('"footer.historyLibrary": "历史库"', i18n_source)
         self.assertIn('"historyLibrary.openFull": "打开完整历史库"', i18n_source)
         self.assertRegex(sidebar_styles, r"\.task-history-library-slot\s*\{[^}]*margin-bottom:\s*12px")
+
+    def test_mobile_workspace_static_contract_exists(self) -> None:
+        html = Path("codex_image/webui/static/index.html").read_text(encoding="utf-8")
+        main_source = Path("codex_image/webui/frontend/src/main.ts").read_text(encoding="utf-8")
+        mobile_source = Path("codex_image/webui/frontend/src/mobile-workspace.ts").read_text(encoding="utf-8")
+        styles = Path("codex_image/webui/static/styles/80-utilities-responsive.css").read_text(encoding="utf-8")
+        elements_source = self._elements_source()
+
+        self.assertIn('id="mobileWorkspaceTabs"', html)
+        for tab in ("reference", "prompt", "settings", "preview"):
+            self.assertIn(f'data-mobile-workspace-tab="{tab}"', html)
+        self.assertIn('id="mobileHistoryButton"', html)
+        self.assertIn('id="mobileHistoryBackdrop"', html)
+        self.assertIn('import { initMobileWorkspaceFeature } from "./mobile-workspace"', main_source)
+        self.assertIn("initMobileWorkspaceFeature();", main_source)
+        self.assertIn("function setMobileWorkspaceTab", mobile_source)
+        self.assertIn("openMobileHistoryDrawer", mobile_source)
+        self.assertIn("closeMobileHistoryDrawer", mobile_source)
+        self.assertIn("setMobileWorkspaceTab", mobile_source)
+        self.assertIn("mobileWorkspaceTabs: document.querySelector(\"#mobileWorkspaceTabs\")", elements_source)
+        self.assertIn("@media (max-width: 640px)", styles)
+        self.assertIn(".mobile-workspace-tabs", styles)
+        self.assertIn('html[data-mobile-workspace="preview"] .controls-col', styles)
+        self.assertIn('html[data-mobile-history-open="true"] .sidebar', styles)
+        self.assertIn(".user-guide-drawer", styles)
+        self.assertRegex(styles, r"\.prompt-footer\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)")
+        self.assertRegex(styles, r"\.prompt-footer\s*>\s*\.icon-text-button\s*\{[^}]*min-width:\s*0")
 
     def test_history_page_static_contract_exists(self) -> None:
         history_html = Path("codex_image/webui/static/history.html").read_text(encoding="utf-8")
@@ -627,6 +655,7 @@ class WebUIStaticTaskTests(WebUIStaticTestCase):
         script = self._frontend_script_source()
         harness = "\n".join(
             [
+                "function yuanshuPath(path) { return path; }",
                 self._extract_javascript_function(script, "taskOutputUrls"),
                 self._extract_javascript_function(script, "taskDeletedOutputIndexes"),
                 self._extract_javascript_function(script, "taskSelectedOutputIndexes"),
@@ -877,7 +906,17 @@ class WebUIStaticTaskTests(WebUIStaticTestCase):
         self.assertNotIn("queueDrawer: document.querySelector(\"#queueDrawer\")", elements_source)
         self.assertIn("export function getEls", dom_source)
         self.assertIn("refreshQueue", queue_source)
-        self.assertIn('fetch("/api/queue")', queue_source)
+        self.assertIn('fetch(noStoreUrl("/api/queue")', queue_source)
+        self.assertIn("refreshDashboardSnapshot", queue_source)
+        self.assertIn("YUANSHU_DASHBOARD_SNAPSHOT_LIMIT = 80", queue_source)
+        self.assertIn("/api/dashboard/snapshot?limit=${YUANSHU_DASHBOARD_SNAPSHOT_LIMIT}", queue_source)
+        self.assertIn('headers.set("If-None-Match", yuanshuDashboardSnapshotEtag)', queue_source)
+        self.assertIn("response.status === 304", queue_source)
+        self.assertIn("YUANSHU_ACTIVE_POLL_INTERVAL_MS = 5000", queue_source)
+        self.assertIn("YUANSHU_IDLE_POLL_INTERVAL_MS = 20000", queue_source)
+        self.assertIn('document.addEventListener("visibilitychange", handleYuanshuVisibilityChange)', queue_source)
+        self.assertIn("document.hidden", queue_source)
+        self.assertIn("yuanshuDashboardSnapshotInFlight", queue_source)
         self.assertIn("renderQueue", queue_source)
         self.assertIn("renderQueueStatusChip", queue_source)
         self.assertIn("function jumpToActiveTaskGroup", queue_source)
@@ -917,20 +956,20 @@ class WebUIStaticTaskTests(WebUIStaticTestCase):
             boot_source.replace(realtime_fallback_block.group(0), ""),
             r"refreshTasks\(\s*\{ migrateLegacyArchives: true \}\)",
         )
-        self.assertIn("void getLegacyBridge().methods.refreshTasks({ migrateLegacyArchives: shouldMigrateArchives });", queue_source)
+        self.assertIn("void refreshDashboardSnapshot({ migrateLegacyArchives: shouldMigrateArchives }).finally(scheduleYuanshuNextPoll);", queue_source)
         self.assertIn("applyQueueState(payload.queue)", queue_source)
         self.assertIn("function activeTasksNeedQueueReconcile(", queue_source)
-        self.assertIn('status === "submitting" || status === "queued" || status === "running"', queue_source)
+        self.assertIn("ACTIVE_TASK_STATUSES.has(status)", queue_source)
         self.assertIn("activeTasksNeedQueueReconcile(queueTaskIds)", queue_source)
         self.assertNotIn("function selectedTaskNeedsQueueReconcile(", queue_source)
-        self.assertIn("void bridge.methods.refreshTasks();", queue_source)
+        self.assertIn("await bridge.methods.refreshTasks();", queue_source)
         self.assertRegex(
             queue_source,
-            r"if \(!tasks\.length\) \{[\s\S]*needsTaskReconcile[\s\S]*refreshTasks",
+            r"if \(!tasks\.length\) \{[\s\S]*needsTaskReconcile[\s\S]*refreshCompletedQueueSnapshot",
         )
         self.assertRegex(
             queue_source,
-            r"if \(!changed\) \{[\s\S]*needsTaskReconcile[\s\S]*refreshTasks",
+            r"if \(!changed\) \{[\s\S]*needsTaskReconcile[\s\S]*scheduleYuanshuCompletionRefreshBurst",
         )
         self.assertIn("@app.get(\"/api/events\", response_model=None)", queue_routes)
         self.assertIn("stream: bool = False", queue_routes)
@@ -1397,6 +1436,7 @@ class WebUIStaticTaskTests(WebUIStaticTestCase):
                 self._extract_javascript_function(output_source, "updateRangeProgress"),
                 self._extract_javascript_function(output_source, "updateQuantity"),
                 self._extract_javascript_function(output_source, "syncRadioButtons"),
+                self._extract_javascript_function(script, "ensureQuantityOption"),
                 self._extract_javascript_function(script, "applyTaskToForm"),
                 """
                 applyTaskToForm({ mode: "generate", prompt: "history", params: { n: 4 } });
@@ -1780,10 +1820,7 @@ class WebUIStaticTaskTests(WebUIStaticTestCase):
         self.assertIn("data-preview-output-url", source)
         self.assertIn("image.decode?.()", source)
         self.assertIn("let pendingPreviewRenderToken = 0", source)
-        self.assertIn("const previousOutputCount = currentPreviewOutputCardCount()", source)
-        self.assertIn("const preservePreviousImages = previousOutputCount === outputUrls.length", source)
-        self.assertIn("const shouldDeferLayoutSwitch = !preservePreviousImages && outputUrls.length > 0", source)
-        self.assertIn("scheduleDeferredPreviewRender(task, { running, failure, waiting, outputUrls, totalCount, itemCount })", source)
+        self.assertIn("preservePreviousImages: currentPreviewOutputCardCount() === outputUrls.length", source)
         self.assertIn("function scheduleDeferredPreviewRender(", source)
         self.assertIn("function commitOutputPreviewRender(", source)
         self.assertIn("const allImagesLoaded = await preloadPreviewImages(outputUrls)", source)
@@ -1798,7 +1835,7 @@ class WebUIStaticTaskTests(WebUIStaticTestCase):
         self.assertIn("visibleImage.hidden = false", source)
         self.assertIn('visibleImage.removeAttribute("src")', source)
         self.assertIn("function waitForPreviewImageLoad(", source)
-        self.assertIn("if (!loaded) {", source)
+        self.assertIn("if (!loaded) return false;", source)
         self.assertIn("const loaded = image.complete && image.naturalWidth > 0 ? true : await loadedPromise", source)
         self.assertNotIn("image.complete ? image.naturalWidth > 0 : await loadedPromise", source)
         self.assertNotIn("if (image.complete) return Promise.resolve(image.naturalWidth > 0);", source)
@@ -1810,8 +1847,8 @@ class WebUIStaticTaskTests(WebUIStaticTestCase):
         self.assertNotIn("state.previewRenderKey = nextPreviewKey;\n  clearPreviewGridLayout();", source)
         self.assertNotIn("els.previewGrid.innerHTML = outputUrls.map", source)
         self.assertIn('els.previewGrid.addEventListener("click", handlePreviewGridClick)', source)
-        self.assertRegex(styles, r"\.preview-card\.is-loading-next\s*\{[^}]*background:\s*var\(--surface-soft\)")
-        self.assertNotRegex(styles, r"\.preview-card\.is-loading-next\s+img\s*\{[^}]*opacity:\s*0\.")
+        self.assertRegex(styles, r"\.preview-card\.is-loading-next\s*\{[^}]*background:\s*linear-gradient")
+        self.assertRegex(styles, r"\.preview-card\.is-loading-next\s+img\s*\{[^}]*opacity:\s*0\.")
     def test_running_preview_shows_partial_outputs(self) -> None:
         script = self._frontend_script_source()
         source = self._task_preview_source()

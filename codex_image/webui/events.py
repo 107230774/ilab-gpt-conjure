@@ -8,7 +8,7 @@ from fastapi import Request
 from .context import WebUIContext
 from .task_metadata import _gallery_item_response, _with_file_urls
 from .yuanshu_resources import yuanshu_gallery_storage
-from .yuanshu_scope import current_yuanshu_owner_for_request, filter_current_yuanshu_tasks, metadata_matches_current_yuanshu_owner
+from .yuanshu_scope import current_yuanshu_owner_for_request, filter_current_yuanshu_tasks, local_unowned_tasks_visible, metadata_matches_current_yuanshu_owner
 
 
 def queue_snapshot(ctx: WebUIContext, request: Request | None = None) -> dict[str, Any]:
@@ -58,7 +58,7 @@ def queue_snapshot(ctx: WebUIContext, request: Request | None = None) -> dict[st
 def event_snapshot(ctx: WebUIContext, request: Request | None = None) -> dict[str, Any]:
     owner = current_yuanshu_owner_for_request(ctx, request)
     user_id = str(owner.get("user_id") or "").strip() if owner is not None else ""
-    recent_cards = ctx.storage.list_recent_task_cards(limit=200, yuanshu_user_id=user_id) if user_id else []
+    recent_cards = ctx.storage.list_recent_task_cards(limit=200, yuanshu_user_id=user_id) if user_id or local_unowned_tasks_visible(ctx, request) else []
     gallery_storage = yuanshu_gallery_storage(ctx, request)
     return {
         "type": "snapshot",

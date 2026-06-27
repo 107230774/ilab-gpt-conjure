@@ -24,7 +24,7 @@ export function updateRangeProgress(input: any): void {
 export function currentQuantity(): number {
   const value = Number.parseInt(els.nInput?.value || "1", 10);
   if (Number.isNaN(value)) return 1;
-  return Math.min(2, Math.max(1, value));
+  return Math.min(4, Math.max(1, value));
 }
 
 export function updateQuantity(): void {

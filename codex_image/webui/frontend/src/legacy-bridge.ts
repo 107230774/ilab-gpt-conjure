@@ -8,7 +8,7 @@ export interface LegacyMethods {
   setStatus(message: string, type?: string): void;
   applyTasksSnapshot(
     tasks: WebUITask[],
-    options?: { migrateLegacyArchives?: boolean; requestSeq?: number },
+    options?: { migrateLegacyArchives?: boolean; requestSeq?: number; preserveExistingOnEmpty?: boolean },
   ): Promise<void>;
   applyTaskUpdate(task: WebUITask | null | undefined): void;
   ensureSelectedTaskDetail(taskId?: string | null): Promise<WebUITask | null> | WebUITask | null;

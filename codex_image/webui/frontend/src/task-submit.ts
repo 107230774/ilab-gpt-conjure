@@ -223,6 +223,7 @@ function applyTaskToForm(task: any) {
   if (params.model) els.model.value = params.model;
   if (params.size) syncSizeControlsFromSize(params.size);
   if (params.n && els.nInput) {
+    ensureQuantityOption(String(params.n));
     els.nInput.value = String(params.n);
   }
   if (params.quality) els.quality.value = params.quality;
@@ -240,6 +241,16 @@ function applyTaskToForm(task: any) {
   updateCompression();
   updateCustomSize();
   updateRequestPreview();
+}
+
+function ensureQuantityOption(value: string): void {
+  const select = els.nInput as HTMLSelectElement | null;
+  if (!select || typeof select.querySelector !== "function") return;
+  if (select.querySelector(`option[value="${CSS.escape(value)}"]`)) return;
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = value;
+  select.appendChild(option);
 }
 
 function buildPreviewRequest() {
@@ -382,8 +393,11 @@ function addQueuedTask(task: any) {
 function scheduleYuanshuSubmitSettleRefresh(): void {
   YUANSHU_SUBMIT_SETTLE_REFRESH_DELAYS_MS.forEach((delay) => {
     window.setTimeout(() => {
-      void window.refreshQueue?.();
-      void getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+      if (window.refreshDashboardSnapshot) {
+        void window.refreshDashboardSnapshot({ force: true });
+      } else {
+        void window.refreshQueue?.();
+      }
     }, delay);
   });
 }
@@ -515,14 +529,23 @@ async function runTask() {
     if (yuanshuMode) {
       window.startRealtimeUpdates?.({ migrateLegacyArchives: false });
       scheduleYuanshuSubmitSettleRefresh();
+      getLegacyBridge().methods.setMobileWorkspaceTab?.("preview");
     }
     if (els.requestJson) {
       els.requestJson.textContent = JSON.stringify(data.request || {}, null, 2);
     }
     stopRunFeedback();
     setStatus(data.duplicate ? "相同参数的任务已经在提交或生成中，已返回已有任务。" : translate("taskSubmit.queued"), "ok");
-    await window.refreshQueue?.();
-    await getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+    if (yuanshuMode) {
+      if (window.refreshDashboardSnapshot) {
+        await window.refreshDashboardSnapshot({ force: true });
+      } else {
+        await window.refreshQueue?.();
+      }
+    } else {
+      await window.refreshQueue?.();
+      await getLegacyBridge().methods.refreshTasks?.({ preserveExistingOnEmpty: true });
+    }
     await refreshRecentAssets();
     renderPreview(data.task);
   } catch (error) {

@@ -108,7 +108,12 @@ def stamp_current_yuanshu_owner(ctx: WebUIContext, metadata: dict[str, Any], req
 def metadata_matches_current_yuanshu_owner(ctx: WebUIContext, metadata: dict[str, Any], request: Request | None = None) -> bool:
     owner = current_yuanshu_owner_for_request(ctx, request)
     if owner is None:
-        return not _yuanshu_public_mode_enabled()
+        task_owner = metadata.get(YUANSHU_OWNER_KEY)
+        if isinstance(task_owner, dict):
+            return False
+        if not _yuanshu_public_mode_enabled():
+            return True
+        return local_unowned_tasks_visible(ctx, request)
     task_owner = metadata.get(YUANSHU_OWNER_KEY)
     if not isinstance(task_owner, dict):
         return False
@@ -120,7 +125,9 @@ def metadata_matches_current_yuanshu_owner(ctx: WebUIContext, metadata: dict[str
 
 def filter_current_yuanshu_tasks(ctx: WebUIContext, tasks: list[dict[str, Any]], request: Request | None = None) -> list[dict[str, Any]]:
     if current_yuanshu_owner_for_request(ctx, request) is None:
-        return [] if _yuanshu_public_mode_enabled() else tasks
+        if not _yuanshu_public_mode_enabled():
+            return tasks
+        return [task for task in tasks if metadata_matches_current_yuanshu_owner(ctx, task, request)]
     return [task for task in tasks if metadata_matches_current_yuanshu_owner(ctx, task, request)]
 
 
@@ -137,6 +144,18 @@ def require_current_yuanshu_task(ctx: WebUIContext, task_id: str, request: Reque
 def _yuanshu_public_mode_enabled() -> bool:
     raw = os.getenv("YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE", "true").strip().lower()
     return raw not in {"0", "false", "no", "off"}
+
+
+def local_unowned_tasks_visible(ctx: WebUIContext, request: Request | None) -> bool:
+    if request is None:
+        return False
+    path = request.url.path
+    if path == "/image-playground" or path.startswith("/image-playground/"):
+        return False
+    try:
+        return bool(ctx.auth_checker())
+    except Exception:
+        return False
 
 
 def _int_or_none(value: Any) -> int | None:
