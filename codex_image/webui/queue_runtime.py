@@ -29,6 +29,7 @@ from .executor import (
 from .queue import NonRetryableTaskError, QueueChannel, QueueManager
 from .storage import utc_now
 from .yuanshu import yuanshu_client, yuanshu_client_from_session
+from .yuanshu_resources import yuanshu_gallery_storage_for_task
 from .yuanshu_scope import YUANSHU_SESSION_REF_KEY
 
 
@@ -190,7 +191,7 @@ async def execute_task(
         client = _client_for_queue_channel(ctx, channel, metadata, client_factory_overridden=client_factory_overridden)
         await _execute_stored_task(
             storage=ctx.storage,
-            gallery_storage=ctx.gallery_storage,
+            gallery_storage=yuanshu_gallery_storage_for_task(ctx, metadata),
             reference_asset_storage=ctx.reference_asset_storage,
             task_id=task_id,
             client=client,

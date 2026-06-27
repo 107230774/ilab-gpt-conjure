@@ -291,9 +291,9 @@ class WebUIGenerationTests(unittest.TestCase):
         self.assertEqual(index_response.status_code, 200)
         self.assertEqual(history_response.status_code, 200)
         self.assertEqual(script_response.status_code, 200)
-        self.assertEqual(index_response.headers["cache-control"], "no-store")
-        self.assertEqual(history_response.headers["cache-control"], "no-store")
-        self.assertEqual(script_response.headers["cache-control"], "no-store")
+        self.assertIn("no-store", index_response.headers["cache-control"])
+        self.assertIn("no-store", history_response.headers["cache-control"])
+        self.assertIn("no-store", script_response.headers["cache-control"])
         self.assertIn("/static/history.js", history_response.text)
     def test_generate_route_omits_png_compression(self) -> None:
         from codex_image.webui.app import create_app

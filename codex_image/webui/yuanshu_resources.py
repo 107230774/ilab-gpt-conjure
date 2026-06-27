@@ -9,7 +9,7 @@ from fastapi import Request
 from .context import WebUIContext
 from .storage import GalleryStorage
 from .settings_store import PromptSnippetSettings, PromptTemplateSettings
-from .yuanshu_scope import current_yuanshu_owner_for_request
+from .yuanshu_scope import YUANSHU_OWNER_KEY, current_yuanshu_owner_for_request
 
 
 def current_yuanshu_user_id(ctx: WebUIContext, request: Request | None) -> str:
@@ -19,9 +19,24 @@ def current_yuanshu_user_id(ctx: WebUIContext, request: Request | None) -> str:
 
 def yuanshu_gallery_storage(ctx: WebUIContext, request: Request | None) -> GalleryStorage:
     user_id = current_yuanshu_user_id(ctx, request)
-    if not user_id:
+    return yuanshu_gallery_storage_for_user(ctx, user_id)
+
+
+def yuanshu_gallery_storage_for_task(ctx: WebUIContext, metadata: dict[str, Any] | None) -> GalleryStorage:
+    owner = metadata.get(YUANSHU_OWNER_KEY) if isinstance(metadata, dict) else None
+    return yuanshu_gallery_storage_for_owner(ctx, owner if isinstance(owner, dict) else None)
+
+
+def yuanshu_gallery_storage_for_owner(ctx: WebUIContext, owner: dict[str, Any] | None) -> GalleryStorage:
+    user_id = str(owner.get("user_id") or "").strip() if owner is not None else ""
+    return yuanshu_gallery_storage_for_user(ctx, user_id)
+
+
+def yuanshu_gallery_storage_for_user(ctx: WebUIContext, user_id: str) -> GalleryStorage:
+    clean_user_id = str(user_id or "").strip()
+    if not clean_user_id:
         return ctx.gallery_storage
-    return GalleryStorage(_yuanshu_user_resource_root(ctx, user_id) / "gallery")
+    return GalleryStorage(_yuanshu_user_resource_root(ctx, clean_user_id) / "gallery")
 
 
 def yuanshu_prompt_snippet_settings(ctx: WebUIContext, request: Request | None) -> PromptSnippetSettings:

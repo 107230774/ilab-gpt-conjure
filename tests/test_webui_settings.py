@@ -107,6 +107,7 @@ class WebUISettingsTests(unittest.TestCase):
             )
             same_user_snippets = client.get("/api/prompt-snippets", headers=user_a_new_key).json()["snippets"]
             same_user_templates = client.get("/api/prompt-templates", headers=user_a_new_key).json()["templates"]
+            used_template = client.post(f"/api/prompt-templates/{created_template.json()['template']['id']}/use", headers=user_a_new_key)
             other_user_snippets = client.get("/api/prompt-snippets", headers=user_b).json()["snippets"]
             other_user_templates = client.get("/api/prompt-templates", headers=user_b).json()["templates"]
 
@@ -114,8 +115,10 @@ class WebUISettingsTests(unittest.TestCase):
         self.assertEqual(forbidden_template.status_code, 403)
         self.assertEqual(created_snippet.status_code, 200)
         self.assertEqual(created_template.status_code, 200)
+        self.assertEqual(used_template.status_code, 200)
         self.assertEqual([snippet["tag"] for snippet in same_user_snippets], ["pose"])
         self.assertEqual([template["title"] for template in same_user_templates], ["人像模板"])
+        self.assertEqual(used_template.json()["template"]["usage_count"], 1)
         self.assertEqual(other_user_snippets, [])
         self.assertEqual(other_user_templates, [])
 

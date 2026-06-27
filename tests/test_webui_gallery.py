@@ -624,6 +624,76 @@ class WebUIGalleryTests(unittest.TestCase):
             asyncio.run(app.state.queue_manager.run_available_once())
 
         self.assertEqual(fake.generate_calls[0]["reference_images"][0].split(",", 1)[0], "data:image/jpeg;base64")
+
+    def test_yuanshu_queue_worker_resolves_gallery_refs_from_task_owner_scope(self) -> None:
+        from codex_image.webui.app import create_app
+        from codex_image.webui.yuanshu_scope import YUANSHU_SESSION_REF_KEY
+
+        fake = FakeImageClient()
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE": "true"}):
+            root = Path(tmp)
+            app = create_app(
+                output_root=root / "tasks",
+                gallery_root=root / "gallery",
+                source_data_root=root / "source-data",
+                client_factory=lambda: fake,
+                auth_checker=lambda: False,
+                auto_start_queue=False,
+            )
+            client = TestClient(app)
+            user_a = self._add_yuanshu_session(app, "session-a", user_id=101, key_id=1)
+            user_a_new_key = self._add_yuanshu_session(app, "session-a-new-key", user_id=101, key_id=2)
+            user_b = self._add_yuanshu_session(app, "session-b", user_id=202, key_id=1)
+            gallery_item = client.post(
+                "/api/gallery",
+                data={"name": "用户 A 商品", "category": "product"},
+                files={"image": ("product.png", b"\x89PNG\r\n\x1a\nuser-a-gallery", "image/png")},
+                headers=user_a,
+            ).json()["item"]
+
+            with patch("codex_image.webui.routes.generation.verify_yuanshu_token", return_value={"ok": True}):
+                other_user_generate = client.post(
+                    "/api/generate",
+                    data={
+                        "prompt": "参考用户 A 商品",
+                        "model": "gpt-image-2",
+                        "size": "1024x1024",
+                        "quality": "low",
+                        "output_format": "png",
+                        "api_provider_id": "yuanshu",
+                        "api_mode": "images",
+                        "gallery_image_ids": gallery_item["id"],
+                    },
+                    headers=user_b,
+                )
+                submitted = client.post(
+                    "/api/generate",
+                    data={
+                        "prompt": "参考用户 A 商品",
+                        "model": "gpt-image-2",
+                        "size": "1024x1024",
+                        "quality": "low",
+                        "output_format": "png",
+                        "api_provider_id": "yuanshu",
+                        "api_mode": "images",
+                        "gallery_image_ids": gallery_item["id"],
+                    },
+                    headers=user_a_new_key,
+                )
+            task_id = submitted.json()["task"]["task_id"]
+            metadata = app.state.ctx.storage.read_metadata(task_id)
+            metadata.pop(YUANSHU_SESSION_REF_KEY, None)
+            app.state.ctx.storage.write_metadata(task_id, metadata)
+
+            asyncio.run(app.state.queue_manager.run_available_once())
+            completed = app.state.ctx.storage.read_metadata(task_id)
+
+        self.assertEqual(other_user_generate.status_code, 404)
+        self.assertEqual(submitted.status_code, 200)
+        self.assertEqual(completed["status"], "completed")
+        self.assertEqual(completed["yuanshu_owner"]["user_id"], 101)
+        self.assertEqual(fake.generate_calls[0]["reference_images"][0].split(",", 1)[0], "data:image/png;base64")
+
     def test_tasks_report_deleted_gallery_references_as_missing(self) -> None:
         from codex_image.webui.app import create_app
 
