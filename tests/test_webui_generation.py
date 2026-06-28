@@ -163,6 +163,63 @@ class WebUIGenerationTests(unittest.TestCase):
         self.assertEqual(metadata["params"]["size"], "3840x2160")
         self.assertEqual(metadata["params"]["resolution"], "4k")
 
+    def test_yuanshu_generate_allows_custom_4k_size(self) -> None:
+        from codex_image.webui.app import create_app
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE": "true"}):
+            root = Path(tmp)
+            app = create_app(
+                output_root=root,
+                source_data_root=root / "source-data",
+                client_factory=lambda: FakeImageClient(),
+                auth_checker=lambda: False,
+                auto_start_queue=False,
+            )
+            client = TestClient(app)
+            headers = self._add_yuanshu_session(app, "session-custom-4k", user_id=101, key_id=1)
+            data = {
+                "prompt": "draw a custom 4k poster",
+                "prompt_for_model": "draw a custom 4k poster",
+                "main_model": "gpt-5.4",
+                "model": "gpt-image-2",
+                "size": "3248x2160",
+                "resolution": "4k",
+                "ratio": "3:2",
+                "orientation": "landscape",
+                "quality": "medium",
+                "output_format": "png",
+                "moderation": "auto",
+                "n": "1",
+                "api_provider_id": "yuanshu",
+                "api_mode": "images",
+            }
+            with patch("codex_image.webui.routes.generation.verify_yuanshu_token", return_value={"ok": True}):
+                response = client.post("/api/generate", data=data, headers=headers)
+
+            body = response.json()
+            metadata = app.state.ctx.storage.read_metadata(body["task"]["task_id"])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(metadata["params"]["size"], "3248x2160")
+        self.assertEqual(metadata["params"]["resolution"], "4k")
+
+    def test_yuanshu_generation_rejects_invalid_custom_sizes(self) -> None:
+        from fastapi import HTTPException
+
+        from codex_image.webui.routes.generation import _enforce_yuanshu_generation_limits
+
+        invalid_sizes = [
+            "3247x2160",
+            "3856x2160",
+            "3840x1024",
+            "512x512",
+            "3840x3840",
+        ]
+        for size in invalid_sizes:
+            with self.subTest(size=size):
+                with self.assertRaises(HTTPException):
+                    _enforce_yuanshu_generation_limits(size, "4k", 1)
+
     def test_generate_route_persists_task_and_passes_parameters(self) -> None:
         from codex_image.webui.app import create_app
 

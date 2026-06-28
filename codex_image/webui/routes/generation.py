@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,13 @@ from codex_image.webui.yuanshu import verify_yuanshu_token
 DEFAULT_PROMPT_FIDELITY = "strict"
 ACTIVE_DEDUPLICATION_STATUSES = {"submitting", "queued", "running"}
 YUANSHU_ALLOWED_RESOLUTIONS = {"auto", "standard", "2k", "4k"}
+YUANSHU_MIN_SIZE_DIMENSION = 16
+YUANSHU_MAX_SIZE_DIMENSION = 3840
+YUANSHU_SIZE_MULTIPLE = 16
+YUANSHU_MIN_SIZE_PIXELS = 655360
+YUANSHU_MAX_SIZE_PIXELS = 8294400
+YUANSHU_MAX_LONG_SHORT_RATIO = 3
+YUANSHU_SIZE_PATTERN = re.compile(r"^(\d+)x(\d+)$")
 YUANSHU_ALLOWED_SIZES = {
     "auto",
     "1024x1024",
@@ -67,6 +75,32 @@ YUANSHU_ALLOWED_SIZES = {
 }
 
 
+def _is_yuanshu_size_enabled(size: str) -> bool:
+    if size in YUANSHU_ALLOWED_SIZES:
+        return True
+
+    match = YUANSHU_SIZE_PATTERN.fullmatch(size)
+    if match is None:
+        return False
+
+    width = int(match.group(1))
+    height = int(match.group(2))
+    if width < YUANSHU_MIN_SIZE_DIMENSION or height < YUANSHU_MIN_SIZE_DIMENSION:
+        return False
+    if width > YUANSHU_MAX_SIZE_DIMENSION or height > YUANSHU_MAX_SIZE_DIMENSION:
+        return False
+    if width % YUANSHU_SIZE_MULTIPLE != 0 or height % YUANSHU_SIZE_MULTIPLE != 0:
+        return False
+
+    short_side = min(width, height)
+    long_side = max(width, height)
+    if long_side / short_side > YUANSHU_MAX_LONG_SHORT_RATIO:
+        return False
+
+    pixels = width * height
+    return YUANSHU_MIN_SIZE_PIXELS <= pixels <= YUANSHU_MAX_SIZE_PIXELS
+
+
 def _is_yuanshu_request(api_provider_id: str | None, api_mode: str | None) -> bool:
     return str(api_provider_id or "").strip().lower() == "yuanshu" or str(api_mode or "").strip().lower() == "yuanshu"
 
@@ -95,7 +129,7 @@ def _enforce_yuanshu_generation_limits(size: str, resolution: str | None, n: int
         raise HTTPException(status_code=400, detail="Yuanshu mode supports at most 2 images per task")
     if clean_resolution and clean_resolution not in YUANSHU_ALLOWED_RESOLUTIONS:
         raise HTTPException(status_code=400, detail="This image resolution is not enabled in Yuanshu mode")
-    if clean_size not in YUANSHU_ALLOWED_SIZES:
+    if not _is_yuanshu_size_enabled(clean_size):
         raise HTTPException(status_code=400, detail="This image size is not enabled in Yuanshu mode")
     return clean_size, (clean_resolution or resolution), clean_n
 
