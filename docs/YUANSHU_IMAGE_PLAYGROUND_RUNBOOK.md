@@ -1,6 +1,6 @@
 # Yuanshu Image Playground Runbook
 
-Last updated: 2026-06-27 19:47 CST
+Last updated: 2026-06-28 18:03 CST
 
 This file is the project-local source of truth for Yuanshu online image playground development, release, deployment, rollback, and production status. Future work in this repository should read this file first instead of depending on Sub2API-side deployment notes.
 
@@ -35,8 +35,8 @@ Nginx routing on `yuan`:
 Active yuan image service:
 
 - Container name: `yuanshu-image-playground`
-- Runtime image: `yuanshu-image-playground:0.1.1-ilab-yuanshu-reference-feedback-guide-cachebump-20260627`
-- Image ID: `sha256:e5e969cd34a7b94aef713b2235c6498e908e0cc59285237713b5f01ed1fc6ac5`
+- Runtime image: `yuanshu-image-playground:0.1.1-ilab-yuanshu-enable-4k-20260628`
+- Image ID: `sha256:d5e7b1b7ced63055c28b12357cbc7dcb0b77502eaf73a6bc333af78a55342a4c`
 - Host port: `127.0.0.1:18080` -> container port `8787`
 - Persistent data: `/opt/yuanshu-image-playground/ilab-output` mounted at `/app/output`
 - Backup root: `/opt/yuanshu-image-playground/backups`
@@ -44,6 +44,8 @@ Active yuan image service:
 Current rollback anchor:
 
 - Old target container is intentionally still running during the 24-hour observation window after the 2026-06-26 migration.
+- Previous yuan image before the 4K enablement hotfix: `yuanshu-image-playground:0.1.1-ilab-yuanshu-dashboard-mobile-perf-20260628`.
+- Inspect backup before the 4K enablement cutover: `/opt/yuanshu-image-playground/backups/yuanshu-image-playground-before-enable-4k-20260628-180112.json`.
 - Previous yuan image before the reference feedback and guide release: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-worker-scope-20260627`.
 - Inspect backup before the reference feedback and guide cutover: `/opt/yuanshu-image-playground/backups/yuanshu-image-playground-before-reference-feedback-guide-cachebump-20260627-211006.json`.
 - Previous yuan image before the gallery worker-scope fix: `yuanshu-image-playground:0.1.1-ilab-yuanshu-gallery-idempotency-cachebump-20260627`.
@@ -525,6 +527,42 @@ curl -fsS https://yuans.vip/image-playground/api/health | head -c 300
 Note: because target IP was classified as robot IP traffic by the upstream provider, this rollback may restore page/history service but may not restore successful image generation.
 
 ## Latest Release Record
+
+2026-06-28 18:03 CST, `image-playground Yuanshu 4K enablement hotfix`:
+
+- Type: yuan-local image playground hotfix; did not rebuild or restart Sub2API, PostgreSQL, Redis, billing, account pool, usage logs, Nginx, or the main Yuanshu app.
+- Scope: re-enabled Yuanshu mode 4K generation by restoring backend resolution/size allowlists, restoring the 4K preset UI option, and removing the frontend Yuanshu-only 4K-to-2K downgrade.
+- Cache fix: homepage `styles.css` and `app.js` moved to `runtime-390`; history page `styles.css` stayed on `runtime-389`; `history.js` stayed on `history-33`.
+- Source commit deployed: `3ebfb9e fix: enable yuanshu 4k image generation`.
+- Source package: `/tmp/ilab-gpt-conjure-enable-4k-3ebfb9e.tgz`.
+- Source package SHA256: `1121f971866c6a760cffad66665a02872669daa5f8c7b7b8fbd57bb549ea6e30`.
+- New image: `yuanshu-image-playground:0.1.1-ilab-yuanshu-enable-4k-20260628`.
+- New image ID: `sha256:d5e7b1b7ced63055c28b12357cbc7dcb0b77502eaf73a6bc333af78a55342a4c`.
+- Rollback backup: `/opt/yuanshu-image-playground/backups/yuanshu-image-playground-before-enable-4k-20260628-180112.json`.
+- Previous image retained: `yuanshu-image-playground:0.1.1-ilab-yuanshu-dashboard-mobile-perf-20260628`.
+- Local validation: `npm run check:webui`; targeted Yuanshu 4K generation/static layout unittest coverage; Python `py_compile`.
+- Canary validation: yuan `127.0.0.1:18081` `/api/health`, homepage `runtime-390`, history page `runtime-389`/`history-33`, unauthenticated `POST /api/gallery` returning 403, and no serious canary logs.
+- Production validation: yuan `127.0.0.1:18080` `/api/health`, homepage `runtime-390`, history page `runtime-389`/`history-33`, no canary left, and no recent serious image-playground logs.
+- Public validation: `https://yuans.vip/health`, `/image-playground/api/health`, `/image-playground/`, `/image-playground/history`, `/image-playground-console`, `/image-playground/static/app.js?v=runtime-390`, `/image-playground/static/styles.css?v=runtime-390`, and `/image-playground/static/history.js?v=history-33` returned OK.
+- Static validation: `/image-playground/static/app.js?v=runtime-390` returned `Content-Length: 2146766` and `X-Yuanshu-Static-Cache: HIT`; `/image-playground/static/styles.css?v=runtime-390` warmed to `X-Yuanshu-Static-Cache: HIT`.
+
+Rollback for this release:
+
+```bash
+rtk ssh yuan "set -euo pipefail
+docker rm -f yuanshu-image-playground
+docker run -d --name yuanshu-image-playground \
+  -p 127.0.0.1:18080:8787 \
+  -e ILAB_CONJURE_DATA_DIR=/app/output \
+  -e YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE=true \
+  -e YUANSHU_IMAGE_PLAYGROUND_API_BASE=https://yuans.vip/image-playground/api/v1 \
+  -e YUANSHU_IMAGE_PLAYGROUND_PATH_PREFIX=/image-playground \
+  -v /opt/yuanshu-image-playground/ilab-output:/app/output \
+  yuanshu-image-playground:0.1.1-ilab-yuanshu-dashboard-mobile-perf-20260628
+curl -fsS http://127.0.0.1:18080/api/health | head -c 300
+curl -fsS https://yuans.vip/image-playground/ | grep -E '/image-playground/static/(styles.css|app.js)' | head -2
+"
+```
 
 2026-06-28 01:24 CST, `image-playground dashboard snapshot and mobile workspace release`:
 
