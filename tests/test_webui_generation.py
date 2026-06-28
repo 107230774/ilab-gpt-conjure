@@ -123,6 +123,46 @@ class WebUIGenerationTests(unittest.TestCase):
         self.assertEqual(after_completed.status_code, 200)
         self.assertNotEqual(after_completed.json()["task"]["task_id"], first.json()["task"]["task_id"])
 
+    def test_yuanshu_generate_allows_4k_size_and_resolution(self) -> None:
+        from codex_image.webui.app import create_app
+
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {"YUANSHU_IMAGE_PLAYGROUND_PUBLIC_MODE": "true"}):
+            root = Path(tmp)
+            app = create_app(
+                output_root=root,
+                source_data_root=root / "source-data",
+                client_factory=lambda: FakeImageClient(),
+                auth_checker=lambda: False,
+                auto_start_queue=False,
+            )
+            client = TestClient(app)
+            headers = self._add_yuanshu_session(app, "session-4k", user_id=101, key_id=1)
+            data = {
+                "prompt": "draw a 4k wide poster",
+                "prompt_for_model": "draw a 4k wide poster",
+                "main_model": "gpt-5.4",
+                "model": "gpt-image-2",
+                "size": "3840x2160",
+                "resolution": "4k",
+                "ratio": "16:9",
+                "orientation": "landscape",
+                "quality": "medium",
+                "output_format": "png",
+                "moderation": "auto",
+                "n": "1",
+                "api_provider_id": "yuanshu",
+                "api_mode": "images",
+            }
+            with patch("codex_image.webui.routes.generation.verify_yuanshu_token", return_value={"ok": True}):
+                response = client.post("/api/generate", data=data, headers=headers)
+
+            body = response.json()
+            metadata = app.state.ctx.storage.read_metadata(body["task"]["task_id"])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(metadata["params"]["size"], "3840x2160")
+        self.assertEqual(metadata["params"]["resolution"], "4k")
+
     def test_generate_route_persists_task_and_passes_parameters(self) -> None:
         from codex_image.webui.app import create_app
 

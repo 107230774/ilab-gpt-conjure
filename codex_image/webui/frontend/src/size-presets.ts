@@ -218,10 +218,6 @@ export function currentTaskParams(): any {
       params.orientation = orientationForDimensions(dimensions[0], dimensions[1]);
     }
   }
-  if (document.documentElement.dataset.yuanshuMode === "true" && params.resolution === "4k") {
-    params.resolution = "2k";
-    params.size = sizeForPreset("2k", params.ratio || DEFAULT_RATIO);
-  }
   if (currentAuthSource() === "api") {
     params.api_provider_id = currentApiProviderId();
     params.api_mode = currentApiMode();

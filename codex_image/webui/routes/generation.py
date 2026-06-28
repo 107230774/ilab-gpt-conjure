@@ -28,7 +28,7 @@ from codex_image.webui.yuanshu import verify_yuanshu_token
 
 DEFAULT_PROMPT_FIDELITY = "strict"
 ACTIVE_DEDUPLICATION_STATUSES = {"submitting", "queued", "running"}
-YUANSHU_ALLOWED_RESOLUTIONS = {"auto", "standard", "2k"}
+YUANSHU_ALLOWED_RESOLUTIONS = {"auto", "standard", "2k", "4k"}
 YUANSHU_ALLOWED_SIZES = {
     "auto",
     "1024x1024",
@@ -53,6 +53,17 @@ YUANSHU_ALLOWED_SIZES = {
     "2048x1152",
     "1152x2688",
     "2688x1152",
+    "2880x2880",
+    "2560x3200",
+    "3200x2560",
+    "2448x3264",
+    "3264x2448",
+    "2336x3504",
+    "3504x2336",
+    "2160x3840",
+    "3840x2160",
+    "1632x3808",
+    "3808x1632",
 }
 
 

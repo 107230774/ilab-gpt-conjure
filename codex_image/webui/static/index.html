@@ -77,7 +77,7 @@
         document.documentElement.dataset.locale = locale;
       })();
     </script>
-    <link rel="stylesheet" href="/image-playground/static/styles.css?v=runtime-389" />
+    <link rel="stylesheet" href="/image-playground/static/styles.css?v=runtime-390" />
   </head>
   <body>
     <div class="layout-container">
@@ -549,10 +549,12 @@
                   <div class="radio-group" id="resolutionGroup">
                     <button class="radio-btn active" data-val="standard" type="button">1K</button>
                     <button class="radio-btn" data-val="2k" type="button">2K</button>
+                    <button class="radio-btn" data-val="4k" type="button">4K</button>
                   </div>
                   <select id="resolution" class="hidden">
                     <option value="standard" selected>1K</option>
                     <option value="2k">2K</option>
+                    <option value="4k">4K</option>
                   </select>
                 </div>
 
@@ -1244,7 +1246,7 @@
     </div>
 
     <div id="taskNotificationToastRegion" class="task-notification-toast-region" aria-live="polite"></div>
-  <script src="/image-playground/static/app.js?v=runtime-389"></script>
+  <script src="/image-playground/static/app.js?v=runtime-390"></script>
     <script>
       (() => {
         document.querySelectorAll(".radio-group").forEach((group) => {

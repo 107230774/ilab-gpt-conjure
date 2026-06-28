@@ -2105,6 +2105,8 @@ class WebUIStaticLayoutTests(WebUIStaticTestCase):
         self.assertIn('data-val="standard"', html)
         self.assertIn('data-val="2k"', html)
         self.assertIn('data-val="4k"', html)
+        self.assertIn('<option value="4k">4K</option>', html)
+        self.assertNotIn('params.resolution = "2k"', script)
         self.assertRegex(html, r'<select id="resolution" class="hidden">')
         self.assertRegex(html, r'id="orientationGroup"[\s\S]*data-val="square"[\s\S]*方形')
         orientation_controls = re.search(r'id="orientationGroup"[\s\S]*?<select id="orientation" class="hidden">[\s\S]*?</select>', html)
